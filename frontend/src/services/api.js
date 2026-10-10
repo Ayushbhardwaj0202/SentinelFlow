@@ -1,110 +1,167 @@
-import axios from 'axios';
+import axios from "axios";
 
-const api = axios.create({ baseURL: 'http://localhost:5000' });
-
-// Add token to every request
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('sentinelflow_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+const api = axios.create({
+  baseURL: "http://localhost:5000",
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Auth
+// Add JWT token automatically
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("sentinelflow_token");
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// =========================
+// AUTHENTICATION
+// =========================
+
 export const authAPI = {
-  login: (data) => api.post('/api/auth/login', data),
-  register: (data) => api.post('/api/auth/register', data),
-  me: () => api.get('/api/auth/me')
+  login: (data) => api.post("/api/auth/login", data),
+  register: (data) => api.post("/api/auth/register", data),
+  me: () => api.get("/api/auth/me"),
 };
 
-// Dashboard
+// =========================
+// DASHBOARD
+// =========================
+
 export const dashboardAPI = {
-  getSummary: () => api.get('/api/dashboard/summary')
+  getSummary: () => api.get("/api/dashboard/summary"),
 };
 
-// Users
+// =========================
+// USERS
+// =========================
+
 export const usersAPI = {
-  getAll: () => api.get('/api/users'),
+  getAll: () => api.get("/api/users"),
   getById: (id) => api.get(`/api/users/${id}`),
-  create: (data) => api.post('/api/users', data),
+  create: (data) => api.post("/api/users", data),
   update: (id, data) => api.put(`/api/users/${id}`, data),
-  delete: (id) => api.delete(`/api/users/${id}`)
+  delete: (id) => api.delete(`/api/users/${id}`),
 };
 
-// Devices
+// =========================
+// DEVICES
+// =========================
+
 export const devicesAPI = {
-  getAll: () => api.get('/api/devices'),
-  create: (data) => api.post('/api/devices', data),
+  getAll: () => api.get("/api/devices"),
+  getById: (id) => api.get(`/api/devices/${id}`),
+  create: (data) => api.post("/api/devices", data),
   update: (id, data) => api.put(`/api/devices/${id}`, data),
-  delete: (id) => api.delete(`/api/devices/${id}`)
+  delete: (id) => api.delete(`/api/devices/${id}`),
 };
 
-// Activities
+// =========================
+// ACTIVITIES
+// =========================
+
 export const activitiesAPI = {
-  getAll: (params) => api.get('/api/activities', { params }),
+  getAll: () => api.get("/api/activities"),
   getById: (id) => api.get(`/api/activities/${id}`),
-  create: (data) => api.post('/api/activities', data)
+  create: (data) => api.post("/api/activities", data),
 };
 
-// Sessions
+// =========================
+// SESSIONS
+// =========================
+
 export const sessionsAPI = {
-  getAll: () => api.get('/api/sessions'),
-  create: (data) => api.post('/api/sessions', data)
+  getAll: () => api.get("/api/sessions"),
+  getById: (id) => api.get(`/api/sessions/${id}`),
 };
 
-// Risk
-export const riskAPI = {
-  getAll: () => api.get('/api/risk-assessments'),
-  create: (data) => api.post('/api/risk-assessments', data)
-};
+// =========================
+// BEHAVIOR ANALYSIS
+// =========================
 
-// Threats
-export const threatsAPI = {
-  getAll: (params) => api.get('/api/threats', { params }),
-  getById: (id) => api.get(`/api/threats/${id}`),
-  update: (id, data) => api.put(`/api/threats/${id}`, data)
-};
-
-// Alerts
-export const alertsAPI = {
-  getAll: (params) => api.get('/api/alerts', { params }),
-  getById: (id) => api.get(`/api/alerts/${id}`),
-  create: (data) => api.post('/api/alerts', data),
-  update: (id, data) => api.put(`/api/alerts/${id}`, data)
-};
-
-// Investigations
-export const investigationsAPI = {
-  getAll: () => api.get('/api/investigations'),
-  getById: (id) => api.get(`/api/investigations/${id}`),
-  create: (data) => api.post('/api/investigations', data),
-  update: (id, data) => api.put(`/api/investigations/${id}`, data),
-  addFinding: (id, data) => api.post(`/api/investigations/${id}/findings`, data),
-  getFindings: (id) => api.get(`/api/investigations/${id}/findings`)
-};
-
-// Reports
-export const reportsAPI = {
-  getAll: () => api.get('/api/reports'),
-  getById: (id) => api.get(`/api/reports/${id}`),
-  generate: (data) => api.post('/api/reports', data)
-};
-
-// Audit
-export const auditAPI = {
-  getAll: (params) => api.get('/api/audit-logs', { params })
-};
-
-// Behavior
 export const behaviorAPI = {
-  getAll: () => api.get('/api/behavior-analysis'),
-  analyze: (data) => api.post('/api/behavior-analysis', data)
+  getAll: () => api.get("/api/behavior-analysis"),
+  getById: (id) => api.get(`/api/behavior-analysis/${id}`),
+  analyze: (data) => api.post("/api/behavior-analysis", data),
 };
 
-// Policies
+// =========================
+// RISK ASSESSMENTS
+// =========================
+
+export const riskAPI = {
+  getAll: () => api.get("/api/risk-assessments"),
+  getById: (id) => api.get(`/api/risk-assessments/${id}`),
+  calculate: (data) => api.post("/api/risk-assessments", data),
+};
+
+// =========================
+// THREATS
+// =========================
+
+export const threatsAPI = {
+  getAll: () => api.get("/api/threats"),
+  getById: (id) => api.get(`/api/threats/${id}`),
+  create: (data) => api.post("/api/threats", data),
+  update: (id, data) => api.put(`/api/threats/${id}`, data),
+};
+
+// =========================
+// ALERTS
+// =========================
+
+export const alertsAPI = {
+  getAll: () => api.get("/api/alerts"),
+  getById: (id) => api.get(`/api/alerts/${id}`),
+  create: (data) => api.post("/api/alerts", data),
+  update: (id, data) => api.put(`/api/alerts/${id}`, data),
+};
+
+// =========================
+// INVESTIGATIONS
+// =========================
+
+export const investigationsAPI = {
+  getAll: () => api.get("/api/investigations"),
+  getById: (id) => api.get(`/api/investigations/${id}`),
+  create: (data) => api.post("/api/investigations", data),
+  update: (id, data) => api.put(`/api/investigations/${id}`, data),
+};
+
+// =========================
+// REPORTS
+// =========================
+
+export const reportsAPI = {
+  getAll: () => api.get("/api/reports"),
+  getById: (id) => api.get(`/api/reports/${id}`),
+  create: (data) => api.post("/api/reports", data),
+};
+
+// =========================
+// AUDIT LOGS
+// =========================
+
+export const auditAPI = {
+  getAll: () => api.get("/api/audit-logs"),
+};
+
+// =========================
+// POLICIES
+// =========================
+
 export const policiesAPI = {
-  getAll: () => api.get('/api/policies'),
-  create: (data) => api.post('/api/policies', data),
-  update: (id, data) => api.put(`/api/policies/${id}`, data)
+  getAll: () => api.get("/api/policies"),
+  getById: (id) => api.get(`/api/policies/${id}`),
+  create: (data) => api.post("/api/policies", data),
+  update: (id, data) => api.put(`/api/policies/${id}`, data),
 };
 
 export default api;

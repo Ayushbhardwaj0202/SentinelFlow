@@ -1,14 +1,34 @@
+const path = require('path');
+module.paths.push(path.join(__dirname, '..', 'backend', 'node_modules'));
+
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-require('dotenv').config({ path: '../backend/.env' });
+require('dotenv').config({ path: path.join(__dirname, '..', 'backend', '.env') });
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/sentinelflow'
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:Basketball@8478@localhost:5432/sentinelflow'
 });
 
 async function seed() {
   try {
     console.log('Starting seed...');
+
+// Ensure database sentinelflow exists
+    const rootUrl = (process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/sentinelflow')
+      .replace(/\/sentinelflow(\?.*)?$/, '/postgres$1');
+    const adminPool = new Pool({ connectionString: rootUrl });
+    try {
+      const checkDb = await adminPool.query("SELECT 1 FROM pg_database WHERE datname = 'sentinelflow'");
+      if (checkDb.rowCount === 0) {
+        console.log("Database 'sentinelflow' does not exist. Creating...");
+        await adminPool.query('CREATE DATABASE sentinelflow');
+        console.log("Database 'sentinelflow' created successfully.");
+      }
+    } catch (dbErr) {
+      console.warn("Notice: could not auto-create database (may already exist):", dbErr.message);
+    } finally {
+      await adminPool.end().catch(() => {});
+    }
 
     // Read and execute schema
     const fs = require('fs');
