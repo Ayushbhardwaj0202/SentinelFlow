@@ -1,167 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { auditAPI } from '../services/api';
-import PageHeader from '../components/PageHeader';
-import LoadingSpinner from '../components/LoadingSpinner';
-import EmptyState from '../components/EmptyState';
+const express = require("express");
+const { Pool } = require("pg");
 
-const ACTION_COLORS = {
-  LOGIN: '#10b981',
-  LOGOUT: '#6b7280',
-  CREATE_USER: '#3b82f6',
-  UPDATE_USER: '#f59e0b',
-  DELETE_USER: '#ef4444',
-  RECORD_ACTIVITY: '#8b5cf6',
-  CREATE_ALERT: '#f59e0b',
-  UPDATE_ALERT: '#f59e0b',
-  CREATE_INVESTIGATION: '#3b82f6',
-  UPDATE_INVESTIGATION: '#f59e0b',
-  GENERATE_REPORT: '#10b981',
-  DEFAULT: '#94a3b8',
-};
+const router = express.Router();
 
-export default function AuditLogs() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filters, setFilters] = useState({ action: '', entity_type: '', page: 1 });
-  const PAGE_SIZE = 20;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-  useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      try {
-        const params = {};
-        if (filters.action) params.action = filters.action;
-        if (filters.entity_type) params.entity_type = filters.entity_type;
-        params.limit = PAGE_SIZE;
-        params.offset = (filters.page - 1) * PAGE_SIZE;
-        const res = await auditAPI.getAll(params);
-        setLogs(res.data);
-      } catch (e) {
-        setError('Failed to load audit logs');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLogs();
-  }, [filters]);
+/* =========================================
+   CREATE AUDIT TABLE
+========================================= */
 
-  const getActionColor = (action) => ACTION_COLORS[action] || ACTION_COLORS.DEFAULT;
-
-  return (
-    <div className="fade-in">
-      <PageHeader
-        title="Audit Logs"
-        subtitle="Immutable trail of all security-relevant actions"
-      />
-
-      {error && <div className="alert-error">{error}</div>}
-
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div className="form-group" style={{ marginBottom: 0, flex: '1 1 160px' }}>
-            <input
-              id="audit-filter-action"
-              className="form-input"
-              placeholder="Filter by action..."
-              value={filters.action}
-              onChange={e => setFilters(f => ({ ...f, action: e.target.value, page: 1 }))}
-            />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0, flex: '1 1 160px' }}>
-            <input
-              id="audit-filter-entity"
-              className="form-input"
-              placeholder="Filter by entity type..."
-              value={filters.entity_type}
-              onChange={e => setFilters(f => ({ ...f, entity_type: e.target.value, page: 1 }))}
-            />
-          </div>
-          <button className="btn btn-ghost" onClick={() => setFilters({ action: '', entity_type: '', page: 1 })}>
-            ✕ Clear
-          </button>
-        </div>
-      </div>
-
-      {loading ? <LoadingSpinner /> : logs.length === 0 ? (
-        <EmptyState message="No audit log entries found." icon="📋" />
-      ) : (
-        <>
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Actor</th>
-                  <th>Action</th>
-                  <th>Entity Type</th>
-                  <th>Entity ID</th>
-                  <th>Description</th>
-                  <th>IP Address</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map(log => (
-                  <tr key={log.id}>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                      {new Date(log.created_at).toLocaleString()}
-                    </td>
-                    <td style={{ color: 'var(--accent)', fontWeight: 500 }}>
-                      {log.actor_username || `User #${log.actor_id}`}
-                    </td>
-                    <td>
-                      <span style={{
-                        background: getActionColor(log.action) + '22',
-                        color: getActionColor(log.action),
-                        borderRadius: 4,
-                        padding: '2px 8px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        fontFamily: 'monospace',
-                      }}>
-                        {log.action}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      {log.entity_type || '—'}
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      {log.entity_id || '—'}
-                    </td>
-                    <td style={{ color: 'var(--text-primary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={log.description}>
-                      {log.description || '—'}
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontFamily: 'monospace' }}>
-                      {log.ip_address || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-            <button
-              className="btn btn-ghost"
-              disabled={filters.page === 1}
-              onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}
-            >
-              ← Prev
-            </button>
-            <span style={{ color: 'var(--text-secondary)', padding: '8px 16px' }}>Page {filters.page}</span>
-            <button
-              className="btn btn-ghost"
-              disabled={logs.length < PAGE_SIZE}
-              onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}
-            >
-              Next →
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
+async function ensureTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sentinelflow_audit_logs (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(100),
+      action VARCHAR(150),
+      module VARCHAR(100),
+      reference_id VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'SUCCESS',
+      details TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 }
+
+/* =========================================
+   GET LIVE AUDIT LOGS
+========================================= */
+
+router.get("/", async (req, res) => {
+  try {
+    await ensureTable();
+
+    /*
+      Combine actual system activity,
+      threat and investigation events.
+    */
+
+    const result = await pool.query(`
+      SELECT *
+      FROM (
+        SELECT
+          id,
+          username,
+          activity_type AS action,
+          'Activity Monitoring' AS module,
+          CONCAT('ACT-', id) AS reference_id,
+          'SUCCESS' AS status,
+          CONCAT(
+            'Activity detected: ',
+            activity_type,
+            ' on ',
+            COALESCE(resource, 'system resource'),
+            '. Risk score: ',
+            risk_score
+          ) AS details,
+          created_at
+        FROM sentinelflow_activities
+
+        UNION ALL
+
+        SELECT
+          id,
+          username,
+          'THREAT_DETECTED' AS action,
+          'Threat Detection' AS module,
+          CONCAT('THR-', id) AS reference_id,
+          CASE
+            WHEN status = 'RESOLVED'
+              THEN 'RESOLVED'
+            ELSE 'SUCCESS'
+          END AS status,
+          CONCAT(
+            threat_type,
+            ' detected with severity ',
+            severity,
+            '. Risk score: ',
+            risk_score,
+            '. Current status: ',
+            status
+          ) AS details,
+          created_at
+        FROM sentinelflow_threat_alerts
+
+        UNION ALL
+
+        SELECT
+          id,
+          investigator AS username,
+          CASE
+            WHEN status = 'RESOLVED'
+              THEN 'INVESTIGATION_RESOLVED'
+            ELSE 'INVESTIGATION_STARTED'
+          END AS action,
+          'Investigation' AS module,
+          CONCAT('INV-', id) AS reference_id,
+          'SUCCESS' AS status,
+          CONCAT(
+            title,
+            '. Case status: ',
+            status
+          ) AS details,
+          created_at
+        FROM sentinelflow_investigations
+      ) audit_events
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      logs: result.rows,
+    });
+  } catch (error) {
+    console.error(
+      "Audit log error:",
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to load audit logs",
+      details: error.message,
+    });
+  }
+});
+
+module.exports = router;

@@ -1,55 +1,99 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Activities from "./pages/Activities";
+import Investigations from "./pages/Investigations";
+import Reports from "./pages/Reports";
+import AuditLogs from "./pages/AuditLogs";
+import Layout from "./components/Layout";
 
 import {
-  Activities,
   Threats,
-  Investigations,
-  Reports,
-  AuditLogs,
 } from "./pages/SecurityPages";
+
+import "./index.css";
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+
         <Routes>
 
-          {/* Default route */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-
-          {/* Authentication */}
-          <Route path="/login" element={<Login />} />
-
-          {/* Main Dashboard */}
-          <Route path="/dashboard" element={<Dashboard />} />
-
-          {/* SentinelFlow Security Modules */}
-          <Route path="/activities" element={<Activities />} />
-
-          <Route path="/threats" element={<Threats />} />
-
+          {/* LOGIN - NO SIDEBAR */}
           <Route
-            path="/investigations"
-            element={<Investigations />}
+            path="/login"
+            element={<Login />}
           />
 
-          <Route path="/reports" element={<Reports />} />
+          {/* APPLICATION WITH SIDEBAR */}
+          <Route
+            element={<Layout />}
+          >
 
-          <Route path="/audit-logs" element={<AuditLogs />} />
+            <Route
+              path="/dashboard"
+              element={<Dashboard />}
+            />
 
-          {/* Unknown URL */}
+            <Route
+              path="/activities"
+              element={<Activities />}
+            />
+
+            <Route
+              path="/threats"
+              element={<Threats />}
+            />
+
+            <Route
+              path="/investigations"
+              element={<Investigations />}
+            />
+
+            <Route
+              path="/reports"
+              element={<Reports />}
+            />
+
+            <Route
+              path="/audit-logs"
+              element={<AuditLogs />}
+            />
+
+          </Route>
+
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
+          />
+
           <Route
             path="*"
-            element={<Navigate to="/dashboard" replace />}
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
           />
 
         </Routes>
+
       </BrowserRouter>
     </AuthProvider>
   );

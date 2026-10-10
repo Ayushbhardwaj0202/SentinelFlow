@@ -1,253 +1,520 @@
-import React, { useState, useEffect } from 'react';
-import { reportsAPI } from '../services/api';
-import PageHeader from '../components/PageHeader';
-import LoadingSpinner from '../components/LoadingSpinner';
-import EmptyState from '../components/EmptyState';
-
-const REPORT_TYPES = [
-  { value: 'SECURITY_SUMMARY', label: 'Security Summary' },
-  { value: 'INCIDENT_REPORT', label: 'Incident Report' },
-  { value: 'RISK_ASSESSMENT', label: 'Risk Assessment' },
-  { value: 'COMPLIANCE', label: 'Compliance Report' },
-];
-
-function ReportViewer({ report, onClose }) {
-  const content = report.content || {};
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 700, maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ color: 'var(--accent)', margin: 0 }}>{report.title}</h2>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <span className="badge badge-medium">{report.report_type?.replace('_', ' ')}</span>
-          <span style={{ color: 'var(--text-secondary)', marginLeft: 12, fontSize: '0.85rem' }}>
-            Generated: {new Date(report.created_at).toLocaleString()}
-          </span>
-        </div>
-        {report.summary && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{report.summary}</p>
-          </div>
-        )}
-        <div className="card">
-          <h4 style={{ color: 'var(--text-secondary)', marginTop: 0, marginBottom: 12 }}>Report Data</h4>
-          {content.totalUsers !== undefined && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[
-                { label: 'Total Users', value: content.totalUsers },
-                { label: 'Active Devices', value: content.activeDevices },
-                { label: 'Total Activities', value: content.totalActivities },
-                { label: 'Open Alerts', value: content.openAlerts },
-                { label: 'High Risk Users', value: content.highRiskUsers },
-                { label: 'Open Investigations', value: content.openInvestigations },
-              ].map(item => (
-                <div key={item.label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{item.label}</div>
-                  <div style={{ color: 'var(--accent)', fontSize: '1.4rem', fontWeight: 700 }}>{item.value ?? '—'}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {content.alertsBySeverity && (
-            <div style={{ marginBottom: 16 }}>
-              <h5 style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>Alerts by Severity</h5>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {Object.entries(content.alertsBySeverity).map(([sev, count]) => (
-                  <div key={sev} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 14px', textAlign: 'center' }}>
-                    <div className={`badge badge-${sev.toLowerCase()}`}>{sev}</div>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.2rem', marginTop: 4 }}>{count}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {content.riskDistribution && (
-            <div style={{ marginBottom: 16 }}>
-              <h5 style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>Risk Distribution</h5>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {Object.entries(content.riskDistribution).map(([level, count]) => (
-                  <div key={level} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 14px', textAlign: 'center' }}>
-                    <div className={`badge badge-${level.toLowerCase()}`}>{level}</div>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.2rem', marginTop: 4 }}>{count}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {content.topRiskyUsers && content.topRiskyUsers.length > 0 && (
-            <div>
-              <h5 style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>Top Risky Users</h5>
-              <table className="data-table">
-                <thead><tr><th>Username</th><th>Risk Level</th><th>Department</th></tr></thead>
-                <tbody>
-                  {content.topRiskyUsers.map((u, i) => (
-                    <tr key={i}>
-                      <td>{u.username}</td>
-                      <td><span className={`badge badge-${u.risk_level?.toLowerCase()}`}>{u.risk_level}</span></td>
-                      <td>{u.department || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {/* Fallback: raw JSON if no structured content */}
-          {content.totalUsers === undefined && !content.alertsBySeverity && (
-            <pre style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {JSON.stringify(content, null, 2)}
-            </pre>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+import React, { useEffect, useState } from "react";
+import { reportsAPI } from "../services/api";
 
 export default function Reports() {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [viewReport, setViewReport] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [form, setForm] = useState({
-    title: '',
-    report_type: 'SECURITY_SUMMARY',
-    period_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    period_end: new Date().toISOString().split('T')[0],
-  });
+  const [analytics, setAnalytics] =
+    useState(null);
 
-  const fetchReports = async () => {
+  const [reports, setReports] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [generating, setGenerating] =
+    useState(false);
+
+  const [selectedReport, setSelectedReport] =
+    useState(null);
+
+  const loadData = async () => {
     try {
-      const res = await reportsAPI.getAll();
-      setReports(res.data);
-    } catch (e) {
-      setError('Failed to load reports');
+      const analyticsResponse =
+        await reportsAPI.getAll();
+
+      const reportsResponse =
+        await reportsAPI.getGenerated();
+
+      setAnalytics(
+        analyticsResponse.data
+      );
+
+      setReports(
+        reportsResponse.data.reports || []
+      );
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => {
+    loadData();
 
-  const handleGenerate = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setError('Title is required'); return; }
-    setGenerating(true);
-    setError('');
+    const timer = setInterval(
+      loadData,
+      10000
+    );
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const generateReport = async () => {
     try {
-      const res = await reportsAPI.generate(form);
-      setReports(prev => [res.data, ...prev]);
-      setSuccess('Report generated successfully!');
-      setShowForm(false);
-      setViewReport(res.data);
-      setTimeout(() => setSuccess(''), 4000);
-    } catch (e) {
-      setError(e.response?.data?.error || 'Failed to generate report');
+      setGenerating(true);
+
+      const response =
+        await reportsAPI.generate({
+          generated_by:
+            "Security Analyst",
+        });
+
+      setSelectedReport(
+        response.data.report
+      );
+
+      await loadData();
+    } catch (error) {
+      alert(
+        error.response?.data?.error ||
+          "Failed to generate report"
+      );
     } finally {
       setGenerating(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div
+        style={{
+          padding: "40px",
+          color: "#e5e7eb",
+        }}
+      >
+        Loading Security Reports...
+      </div>
+    );
+  }
+
+  const summary =
+    analytics?.summary || {};
+
   return (
-    <div className="fade-in">
-      <PageHeader
-        title="Security Reports"
-        subtitle="Generate and view security analysis reports"
-        actions={
-          <button className="btn btn-primary" id="generate-report-btn" onClick={() => setShowForm(true)}>
-            📊 Generate Report
-          </button>
-        }
-      />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#080d19",
+        color: "#e5e7eb",
+        padding: "30px",
+      }}
+    >
+      {/* HEADER */}
 
-      {error && <div className="alert-error">{error}</div>}
-      {success && <div className="alert-success">{success}</div>}
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <h1>
+            Security Reports
+          </h1>
 
-      {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: 'var(--accent)', marginTop: 0 }}>Generate New Report</h3>
-            <form onSubmit={handleGenerate}>
-              <div className="form-group">
-                <label className="form-label">Report Title *</label>
-                <input
-                  id="report-title"
-                  className="form-input"
-                  value={form.title}
-                  onChange={e => setForm({ ...form, title: e.target.value })}
-                  placeholder="e.g. Weekly Security Summary"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Report Type</label>
-                <select id="report-type" className="form-select" value={form.report_type} onChange={e => setForm({ ...form, report_type: e.target.value })}>
-                  {REPORT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Period Start</label>
-                  <input id="report-period-start" type="date" className="form-input" value={form.period_start} onChange={e => setForm({ ...form, period_start: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Period End</label>
-                  <input id="report-period-end" type="date" className="form-input" value={form.period_end} onChange={e => setForm({ ...form, period_end: e.target.value })} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={generating} id="submit-report-btn">
-                  {generating ? 'Generating...' : '📊 Generate'}
-                </button>
-              </div>
-            </form>
+          <p
+            style={{
+              color: "#94a3b8",
+            }}
+          >
+            Generate live security risk
+            assessment reports from
+            SentinelFlow data.
+          </p>
+        </div>
+
+        <button
+          onClick={generateReport}
+          disabled={generating}
+          style={{
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            padding: "13px 22px",
+            fontWeight: "700",
+            cursor: generating
+              ? "wait"
+              : "pointer",
+          }}
+        >
+          {generating
+            ? "Generating..."
+            : "Generate Security Report"}
+        </button>
+      </div>
+
+      {/* LIVE ANALYTICS */}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(4, 1fr)",
+          gap: "18px",
+          marginTop: "30px",
+        }}
+      >
+        <Card
+          title="Activities Analyzed"
+          value={
+            summary.activitiesAnalyzed ||
+            0
+          }
+        />
+
+        <Card
+          title="Threats Detected"
+          value={
+            summary.threatsDetected ||
+            0
+          }
+        />
+
+        <Card
+          title="Open Threats"
+          value={
+            summary.openThreats ||
+            0
+          }
+        />
+
+        <Card
+          title="Average Risk"
+          value={`${
+            summary.averageRiskScore ||
+            0
+          }/100`}
+        />
+      </div>
+
+      {/* GENERATED REPORT */}
+
+      {selectedReport && (
+        <div
+          style={{
+            marginTop: "30px",
+            background: "#131d31",
+            border:
+              "1px solid #3b82f6",
+            borderRadius: "12px",
+            padding: "28px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+            }}
+          >
+            <div>
+              <h2>
+                Security Risk Assessment
+              </h2>
+
+              <p
+                style={{
+                  color: "#60a5fa",
+                  fontWeight: "700",
+                }}
+              >
+                {
+                  selectedReport.report_number
+                }
+              </p>
+            </div>
+
+            <span
+              style={{
+                color: "#22c55e",
+                fontWeight: "700",
+              }}
+            >
+              REPORT GENERATED
+            </span>
           </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(4, 1fr)",
+              gap: "15px",
+              margin:
+                "20px 0",
+            }}
+          >
+            <MiniStat
+              label="Activities"
+              value={
+                selectedReport.activities_analyzed
+              }
+            />
+
+            <MiniStat
+              label="Threats"
+              value={
+                selectedReport.threats_detected
+              }
+            />
+
+            <MiniStat
+              label="Critical"
+              value={
+                selectedReport.critical_threats
+              }
+            />
+
+            <MiniStat
+              label="Risk Score"
+              value={`${selectedReport.average_risk_score}/100`}
+            />
+          </div>
+
+          <Section
+            title="Risk Assessment"
+            text={
+              selectedReport.risk_summary
+            }
+          />
+
+          <Section
+            title="Threat Summary"
+            text={
+              selectedReport.threat_summary
+            }
+          />
+
+          <Section
+            title="Investigation Summary"
+            text={
+              selectedReport.investigation_summary
+            }
+          />
+
+          <Section
+            title="Security Recommendations"
+            text={
+              selectedReport.recommendations
+            }
+          />
+
+          <p
+            style={{
+              color: "#64748b",
+              marginTop: "25px",
+              fontSize: "12px",
+            }}
+          >
+            Generated by{" "}
+            {
+              selectedReport.generated_by
+            }{" "}
+            on{" "}
+            {new Date(
+              selectedReport.created_at
+            ).toLocaleString()}
+          </p>
         </div>
       )}
 
-      {viewReport && <ReportViewer report={viewReport} onClose={() => setViewReport(null)} />}
+      {/* PREVIOUS REPORTS */}
 
-      {loading ? <LoadingSpinner /> : reports.length === 0 ? (
-        <EmptyState message="No reports generated yet. Click Generate Report to create your first report." icon="📊" />
-      ) : (
-        <div className="card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Generated By</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map(r => (
-                <tr key={r.id}>
-                  <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{r.title}</td>
-                  <td><span className="badge badge-medium">{r.report_type?.replace(/_/g, ' ')}</span></td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{r.generated_by_username || r.generated_by || '—'}</td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{new Date(r.created_at).toLocaleString()}</td>
-                  <td>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
-                      onClick={() => setViewReport(r)}
-                    >
-                      👁 View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div
+        style={{
+          marginTop: "30px",
+          background: "#131d31",
+          border:
+            "1px solid #26344d",
+          borderRadius: "12px",
+          padding: "25px",
+        }}
+      >
+        <h2>
+          Generated Reports
+        </h2>
+
+        {reports.length === 0 ? (
+          <p
+            style={{
+              color: "#94a3b8",
+            }}
+          >
+            No security reports generated
+            yet.
+          </p>
+        ) : (
+          reports.map((report) => (
+            <div
+              key={report.id}
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems: "center",
+                padding:
+                  "15px 0",
+                borderBottom:
+                  "1px solid #26344d",
+              }}
+            >
+              <div>
+                <strong>
+                  {
+                    report.report_number
+                  }
+                </strong>
+
+                <div
+                  style={{
+                    color: "#94a3b8",
+                    fontSize:
+                      "12px",
+                    marginTop: "4px",
+                  }}
+                >
+                  {
+                    report.report_type
+                  }{" "}
+                  •{" "}
+                  {new Date(
+                    report.created_at
+                  ).toLocaleString()}
+                </div>
+              </div>
+
+              <button
+                onClick={() =>
+                  setSelectedReport(
+                    report
+                  )
+                }
+                style={{
+                  background:
+                    "#172b4d",
+                  color:
+                    "#60a5fa",
+                  border:
+                    "1px solid #334155",
+                  borderRadius:
+                    "6px",
+                  padding:
+                    "8px 14px",
+                  cursor:
+                    "pointer",
+                }}
+              >
+                View Report
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, value }) {
+  return (
+    <div
+      style={{
+        background: "#131d31",
+        border:
+          "1px solid #26344d",
+        borderRadius: "12px",
+        padding: "22px",
+        borderLeft:
+          "4px solid #3b82f6",
+      }}
+    >
+      <div
+        style={{
+          color: "#94a3b8",
+          fontSize: "13px",
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          fontSize: "28px",
+          fontWeight: "800",
+          marginTop: "8px",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+}) {
+  return (
+    <div
+      style={{
+        background: "#0d1628",
+        padding: "15px",
+        borderRadius: "8px",
+        border:
+          "1px solid #26344d",
+      }}
+    >
+      <div
+        style={{
+          color: "#64748b",
+          fontSize: "11px",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          fontSize: "20px",
+          fontWeight: "700",
+          marginTop: "5px",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  text,
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "20px",
+      }}
+    >
+      <h3
+        style={{
+          color: "#60a5fa",
+        }}
+      >
+        {title}
+      </h3>
+
+      <p
+        style={{
+          color: "#cbd5e1",
+          lineHeight: "1.7",
+        }}
+      >
+        {text}
+      </p>
     </div>
   );
 }

@@ -1,647 +1,1331 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
-const activities = [
-  {
-    id: 1,
-    user: "admin",
-    type: "LOGIN",
-    resource: "System",
-    device: "Admin-Laptop",
-    ip: "192.168.1.10",
-    time: "10:42 AM",
-    risk: 10,
-    status: "NORMAL",
-  },
-  {
-    id: 2,
-    user: "employee1",
-    type: "FILE_ACCESS",
-    resource: "Financial_Report.pdf",
-    device: "Employee-PC-01",
-    ip: "192.168.1.21",
-    time: "10:35 AM",
-    risk: 35,
-    status: "NORMAL",
-  },
-  {
-    id: 3,
-    user: "employee2",
-    type: "FAILED_LOGIN",
-    resource: "Authentication",
-    device: "Unknown Device",
-    ip: "172.16.10.45",
-    time: "10:21 AM",
-    risk: 55,
-    status: "SUSPICIOUS",
-  },
-  {
-    id: 4,
-    user: "employee1",
-    type: "DATA_EXPORT",
-    resource: "Customer_Database",
-    device: "Employee-PC-01",
-    ip: "192.168.1.21",
-    time: "09:58 AM",
-    risk: 85,
-    status: "HIGH RISK",
-  },
-  {
-    id: 5,
-    user: "employee2",
-    type: "FILE_ACCESS",
-    resource: "Payroll.xlsx",
-    device: "Unknown Device",
-    ip: "172.16.10.45",
-    time: "09:45 AM",
-    risk: 92,
-    status: "CRITICAL",
-  },
-];
+import {
+  threatsAPI,
+} from "../services/api";
 
-const threats = [
-  {
-    id: "THR-001",
-    title: "Low Risk Login",
-    user: "admin",
-    severity: "LOW",
-    score: 10,
-    status: "RESOLVED",
-  },
-  {
-    id: "THR-002",
-    title: "Large Data Export",
-    user: "employee1",
-    severity: "HIGH",
-    score: 85,
-    status: "UNDER INVESTIGATION",
-  },
-  {
-    id: "THR-003",
-    title: "Suspicious File Access",
-    user: "employee2",
-    severity: "CRITICAL",
-    score: 92,
-    status: "OPEN",
-  },
-];
 
-const investigations = [
-  {
-    id: "INV-001",
-    threat: "Large Data Export",
-    user: "employee1",
-    analyst: "Security Analyst",
-    priority: "HIGH",
-    status: "UNDER INVESTIGATION",
-  },
-  {
-    id: "INV-002",
-    threat: "Suspicious File Access",
-    user: "employee2",
-    analyst: "Security Analyst",
-    priority: "CRITICAL",
-    status: "OPEN",
-  },
-];
-
-const auditLogs = [
-  {
-    id: 1,
-    actor: "admin",
-    action: "LOGIN",
-    target: "SentinelFlow",
-    time: "10:42 AM",
-    result: "SUCCESS",
-  },
-  {
-    id: 2,
-    actor: "Security Analyst",
-    action: "ALERT_CREATED",
-    target: "THR-003",
-    time: "10:23 AM",
-    result: "SUCCESS",
-  },
-  {
-    id: 3,
-    actor: "Security Analyst",
-    action: "INVESTIGATION_STARTED",
-    target: "INV-002",
-    time: "10:25 AM",
-    result: "SUCCESS",
-  },
-  {
-    id: 4,
-    actor: "admin",
-    action: "POLICY_UPDATE",
-    target: "Data Export Policy",
-    time: "09:40 AM",
-    result: "SUCCESS",
-  },
-];
-
-const badgeStyle = (value) => {
-  const colors = {
-    LOW: "#10b981",
-    MEDIUM: "#f59e0b",
-    HIGH: "#f97316",
-    CRITICAL: "#ef4444",
-    OPEN: "#3b82f6",
-    RESOLVED: "#10b981",
-    "UNDER INVESTIGATION": "#f59e0b",
-    NORMAL: "#10b981",
-    SUSPICIOUS: "#f59e0b",
-    "HIGH RISK": "#f97316",
-    SUCCESS: "#10b981",
-  };
-
-  return {
-    display: "inline-block",
-    padding: "5px 10px",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "700",
-    color: colors[value] || "#94a3b8",
-    background: `${colors[value] || "#64748b"}22`,
-    border: `1px solid ${colors[value] || "#64748b"}55`,
-  };
-};
+/* =====================================================
+   COMMON STYLES
+===================================================== */
 
 const pageStyle = {
-  minHeight: "100vh",
-  background: "#080d1c",
-  color: "#f8fafc",
   padding: "30px",
+  minHeight: "100vh",
+  background: "#080d19",
+  color: "#e5e7eb",
 };
 
 const cardStyle = {
-  background: "#111a2d",
-  border: "1px solid #233252",
+  background: "#131d31",
+  border: "1px solid #26344d",
   borderRadius: "12px",
   padding: "22px",
-  marginBottom: "22px",
 };
 
-const tableStyle = {
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const thStyle = {
+const tableHeaderStyle = {
   textAlign: "left",
   padding: "14px",
-  background: "#0b1222",
+  fontSize: "12px",
   color: "#94a3b8",
-  fontSize: "13px",
+  borderBottom: "1px solid #26344d",
+  whiteSpace: "nowrap",
 };
 
-const tdStyle = {
+const tableCellStyle = {
   padding: "14px",
-  borderTop: "1px solid #233252",
-  fontSize: "14px",
+  borderBottom: "1px solid #1e293b",
+  fontSize: "13px",
+  whiteSpace: "nowrap",
 };
 
-function Header({ title }) {
+
+/* =====================================================
+   THREAT HELPERS
+===================================================== */
+
+const severityColors = {
+  LOW: "#22c55e",
+  MEDIUM: "#eab308",
+  HIGH: "#f97316",
+  CRITICAL: "#ef4444",
+};
+
+const statusColors = {
+  OPEN: "#ef4444",
+  ACKNOWLEDGED: "#eab308",
+  UNDER_INVESTIGATION: "#f97316",
+  RESOLVED: "#22c55e",
+  FALSE_POSITIVE: "#94a3b8",
+};
+
+
+function SeverityBadge({ severity }) {
+
+  const color =
+    severityColors[severity] || "#94a3b8";
+
   return (
-    <div
+    <span
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "25px",
+        padding: "5px 10px",
+        borderRadius: "999px",
+        fontSize: "11px",
+        fontWeight: "800",
+        color,
+        background: `${color}22`,
+        border: `1px solid ${color}55`,
       }}
     >
-      <div>
-        <h1 style={{ margin: 0, fontSize: "28px" }}>{title}</h1>
-        <p style={{ color: "#94a3b8", marginTop: "7px" }}>
-          SentinelFlow Security Operations Center
-        </p>
-      </div>
-
-      <div
-        style={{
-          padding: "10px 16px",
-          background: "#17223a",
-          borderRadius: "8px",
-          color: "#60a5fa",
-        }}
-      >
-        ● SYSTEM ONLINE
-      </div>
-    </div>
+      {severity}
+    </span>
   );
 }
 
-/* ================= ACTIVITIES ================= */
 
-export function Activities() {
+function StatusBadge({ status }) {
+
+  const color =
+    statusColors[status] || "#94a3b8";
+
   return (
-    <div style={pageStyle}>
-      <Header title="Activity Monitoring" />
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "15px",
-          marginBottom: "25px",
-        }}
-      >
-        <Stat title="Total Activities" value="5" />
-        <Stat title="Normal" value="2" />
-        <Stat title="Suspicious" value="1" />
-        <Stat title="High Risk" value="2" />
-      </div>
-
-      <div style={cardStyle}>
-        <h2>Employee Activity Logs</h2>
-
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>USER</th>
-              <th style={thStyle}>ACTIVITY</th>
-              <th style={thStyle}>RESOURCE</th>
-              <th style={thStyle}>DEVICE</th>
-              <th style={thStyle}>IP ADDRESS</th>
-              <th style={thStyle}>TIME</th>
-              <th style={thStyle}>RISK</th>
-              <th style={thStyle}>STATUS</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {activities.map((a) => (
-              <tr key={a.id}>
-                <td style={tdStyle}>{a.user}</td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle("MEDIUM")}>{a.type}</span>
-                </td>
-                <td style={tdStyle}>{a.resource}</td>
-                <td style={tdStyle}>{a.device}</td>
-                <td style={tdStyle}>{a.ip}</td>
-                <td style={tdStyle}>{a.time}</td>
-                <td style={tdStyle}>
-                  <strong
-                    style={{
-                      color:
-                        a.risk >= 80
-                          ? "#ef4444"
-                          : a.risk >= 60
-                          ? "#f97316"
-                          : a.risk >= 30
-                          ? "#f59e0b"
-                          : "#10b981",
-                    }}
-                  >
-                    {a.risk}
-                  </strong>
-                </td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(a.status)}>{a.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={cardStyle}>
-        <h2>Risk Scoring Engine</h2>
-        <p style={{ color: "#94a3b8" }}>
-          SentinelFlow calculates an explainable risk score between 0 and 100
-          based on suspicious activities, access patterns, device trust and
-          policy violations.
-        </p>
-
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-          <span style={badgeStyle("LOW")}>0–29 LOW</span>
-          <span style={badgeStyle("MEDIUM")}>30–59 MEDIUM</span>
-          <span style={badgeStyle("HIGH")}>60–79 HIGH</span>
-          <span style={badgeStyle("CRITICAL")}>80–100 CRITICAL</span>
-        </div>
-      </div>
-    </div>
+    <span
+      style={{
+        padding: "5px 10px",
+        borderRadius: "999px",
+        fontSize: "11px",
+        fontWeight: "800",
+        color,
+        background: `${color}22`,
+        border: `1px solid ${color}55`,
+      }}
+    >
+      {status}
+    </span>
   );
 }
 
-/* ================= THREATS ================= */
+
+/* =====================================================
+   THREATS PAGE — LIVE DATABASE DATA
+===================================================== */
 
 export function Threats() {
+
+  const [threats, setThreats] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [updating, setUpdating] =
+    useState(null);
+
+
+  /* =========================================
+     LOAD THREATS
+  ========================================= */
+
+  const loadThreats = async () => {
+
+    try {
+
+      setLoading(true);
+
+      setError("");
+
+      const response =
+        await threatsAPI.getAll();
+
+      setThreats(
+        response.data.threats || []
+      );
+
+    } catch (err) {
+
+      console.error(err);
+
+      setError(
+        err.response?.data?.details ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to load threats"
+      );
+
+    } finally {
+
+      setLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+
+    loadThreats();
+
+    /*
+      Refresh every 5 seconds so that
+      newly detected threats appear automatically.
+    */
+
+    const interval =
+      setInterval(
+        loadThreats,
+        5000
+      );
+
+    return () =>
+      clearInterval(interval);
+
+  }, []);
+
+
+  /* =========================================
+     UPDATE STATUS
+  ========================================= */
+
+  const updateStatus = async (
+    id,
+    status
+  ) => {
+
+    try {
+
+      setUpdating(id);
+
+      await threatsAPI.update(
+        id,
+        { status }
+      );
+
+      await loadThreats();
+
+    } catch (err) {
+
+      alert(
+        err.response?.data?.details ||
+        err.response?.data?.error ||
+        "Failed to update threat"
+      );
+
+    } finally {
+
+      setUpdating(null);
+    }
+  };
+
+
+  /* =========================================
+     COUNTERS
+  ========================================= */
+
+  const openCount =
+    threats.filter(
+      (t) => t.status === "OPEN"
+    ).length;
+
+  const criticalCount =
+    threats.filter(
+      (t) => t.severity === "CRITICAL"
+    ).length;
+
+  const highCount =
+    threats.filter(
+      (t) => t.severity === "HIGH"
+    ).length;
+
+  const investigatingCount =
+    threats.filter(
+      (t) =>
+        t.status ===
+        "UNDER_INVESTIGATION"
+    ).length;
+
+
   return (
+
     <div style={pageStyle}>
-      <Header title="Threat Detection & Alerts" />
+
+      {/* HEADER */}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "25px",
+        }}
+      >
+
+        <div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "28px",
+              fontWeight: "800",
+            }}
+          >
+            Threat Detection
+          </h1>
+
+          <p
+            style={{
+              color: "#94a3b8",
+              marginTop: "8px",
+            }}
+          >
+            Automatically detected insider-threat
+            alerts generated by the risk engine.
+          </p>
+
+        </div>
+
+
+        <div
+          style={{
+            padding: "9px 14px",
+            background: "#0f1d35",
+            border:
+              "1px solid #2563eb",
+            borderRadius: "8px",
+            color: "#60a5fa",
+            fontSize: "13px",
+          }}
+        >
+          ● LIVE MONITORING
+        </div>
+
+      </div>
+
+
+      {/* SUMMARY CARDS */}
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "15px",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "16px",
           marginBottom: "25px",
         }}
       >
-        <Stat title="Total Threats" value="3" />
-        <Stat title="Open" value="1" />
-        <Stat title="Under Investigation" value="1" />
-        <Stat title="Resolved" value="1" />
+
+        <SummaryCard
+          title="Total Threats"
+          value={threats.length}
+          color="#3b82f6"
+        />
+
+        <SummaryCard
+          title="Open"
+          value={openCount}
+          color="#ef4444"
+        />
+
+        <SummaryCard
+          title="Critical"
+          value={criticalCount}
+          color="#ef4444"
+        />
+
+        <SummaryCard
+          title="High"
+          value={highCount}
+          color="#f97316"
+        />
+
+        <SummaryCard
+          title="Investigating"
+          value={investigatingCount}
+          color="#eab308"
+        />
+
       </div>
+
+
+      {/* ERROR */}
+
+      {error && (
+
+        <div
+          style={{
+            marginBottom: "20px",
+            padding: "14px",
+            borderRadius: "8px",
+            background: "#450a0a",
+            border: "1px solid #7f1d1d",
+            color: "#fecaca",
+          }}
+        >
+
+          {error}
+
+        </div>
+
+      )}
+
+
+      {/* THREAT TABLE */}
 
       <div style={cardStyle}>
-        <h2>Detected Threats</h2>
 
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>THREAT ID</th>
-              <th style={thStyle}>THREAT</th>
-              <th style={thStyle}>USER</th>
-              <th style={thStyle}>SEVERITY</th>
-              <th style={thStyle}>RISK SCORE</th>
-              <th style={thStyle}>STATUS</th>
-            </tr>
-          </thead>
+        <h2
+          style={{
+            marginTop: 0,
+            marginBottom: "20px",
+          }}
+        >
+          Active Threat Alerts
+        </h2>
 
-          <tbody>
-            {threats.map((t) => (
-              <tr key={t.id}>
-                <td style={tdStyle}>{t.id}</td>
-                <td style={tdStyle}>{t.title}</td>
-                <td style={tdStyle}>{t.user}</td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(t.severity)}>{t.severity}</span>
-                </td>
-                <td style={tdStyle}>
-                  <strong>{t.score}/100</strong>
-                </td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(t.status)}>{t.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+        {loading ? (
+
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "#94a3b8",
+            }}
+          >
+            Loading threat alerts...
+          </div>
+
+        ) : threats.length === 0 ? (
+
+          <div
+            style={{
+              padding: "50px",
+              textAlign: "center",
+              color: "#94a3b8",
+            }}
+          >
+
+            <div
+              style={{
+                fontSize: "40px",
+                marginBottom: "10px",
+              }}
+            >
+              ✓
+            </div>
+
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: "700",
+                color: "#22c55e",
+              }}
+            >
+              No threats detected
+            </div>
+
+            <div
+              style={{
+                marginTop: "8px",
+              }}
+            >
+              SentinelFlow is monitoring activity.
+            </div>
+
+          </div>
+
+        ) : (
+
+          <div
+            style={{
+              overflowX: "auto",
+            }}
+          >
+
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                minWidth: "1050px",
+              }}
+            >
+
+              <thead>
+
+                <tr>
+
+                  <th style={tableHeaderStyle}>
+                    ID
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    USER
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    THREAT
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    SEVERITY
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    RISK SCORE
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    DESCRIPTION
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    STATUS
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    TIME
+                  </th>
+
+                  <th style={tableHeaderStyle}>
+                    ACTION
+                  </th>
+
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                {threats.map(
+                  (threat) => (
+
+                    <tr key={threat.id}>
+
+                      <td
+                        style={tableCellStyle}
+                      >
+                        <strong>
+                          THR-
+                          {String(
+                            threat.id
+                          ).padStart(
+                            3,
+                            "0"
+                          )}
+                        </strong>
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+                        {threat.username}
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+                        <strong>
+                          {threat.threat_type}
+                        </strong>
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+
+                        <SeverityBadge
+                          severity={
+                            threat.severity
+                          }
+                        />
+
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+
+                        <span
+                          style={{
+                            fontWeight: "800",
+                            color:
+                              threat.risk_score >= 80
+                                ? "#ef4444"
+                                : threat.risk_score >= 60
+                                ? "#f97316"
+                                : "#eab308",
+                          }}
+                        >
+                          {threat.risk_score}/100
+                        </span>
+
+                      </td>
+
+
+                      <td
+                        style={{
+                          ...tableCellStyle,
+                          whiteSpace:
+                            "normal",
+                          maxWidth: "300px",
+                        }}
+                      >
+                        {threat.description}
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+
+                        <StatusBadge
+                          status={
+                            threat.status
+                          }
+                        />
+
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+                        {new Date(
+                          threat.created_at
+                        ).toLocaleString()}
+                      </td>
+
+
+                      <td
+                        style={tableCellStyle}
+                      >
+
+                        {threat.status ===
+                        "OPEN" ? (
+
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                threat.id,
+                                "UNDER_INVESTIGATION"
+                              )
+                            }
+                            disabled={
+                              updating ===
+                              threat.id
+                            }
+                            style={actionButton}
+                          >
+                            Investigate
+                          </button>
+
+                        ) : threat.status ===
+                          "UNDER_INVESTIGATION" ? (
+
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                threat.id,
+                                "RESOLVED"
+                              )
+                            }
+                            disabled={
+                              updating ===
+                              threat.id
+                            }
+                            style={{
+                              ...actionButton,
+                              background:
+                                "#166534",
+                            }}
+                          >
+                            Resolve
+                          </button>
+
+                        ) : (
+
+                          <span
+                            style={{
+                              color:
+                                "#64748b",
+                              fontSize:
+                                "12px",
+                            }}
+                          >
+                            No action
+                          </span>
+
+                        )}
+
+                      </td>
+
+                    </tr>
+
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        )}
+
       </div>
 
-      <div style={cardStyle}>
-        <h2>Detection Rules</h2>
 
-        <ul style={{ color: "#cbd5e1", lineHeight: "2" }}>
-          <li>Multiple failed login attempts</li>
-          <li>Unusual login time</li>
-          <li>Access from unknown device</li>
-          <li>Large data export</li>
-          <li>Access to sensitive resources</li>
-          <li>Abnormally high activity volume</li>
-        </ul>
+      {/* DETECTION RULES */}
+
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: "25px",
+        }}
+      >
+
+        <h2
+          style={{
+            marginTop: 0,
+          }}
+        >
+          Threat Detection Rules
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "12px",
+          }}
+        >
+
+          <Rule
+            title="Failed Login"
+            text="Detects suspicious authentication attempts."
+          />
+
+          <Rule
+            title="Unknown Device"
+            text="Raises risk when activity originates from an untrusted device."
+          />
+
+          <Rule
+            title="Sensitive Resource"
+            text="Detects access to confidential resources."
+          />
+
+          <Rule
+            title="Data Export"
+            text="High-risk rule for large or sensitive data exports."
+          />
+
+          <Rule
+            title="Policy Violation"
+            text="Detects actions that violate security policies."
+          />
+
+          <Rule
+            title="Risk Threshold"
+            text="Automatically generates alerts when risk reaches HIGH or CRITICAL."
+          />
+
+        </div>
+
       </div>
+
     </div>
   );
 }
 
-/* ================= INVESTIGATIONS ================= */
+
+/* =====================================================
+   INVESTIGATIONS
+===================================================== */
 
 export function Investigations() {
+
   return (
+
     <div style={pageStyle}>
-      <Header title="Investigation Center" />
 
-      <div style={cardStyle}>
-        <h2>Active Investigations</h2>
+      <h1>
+        Investigation Management
+      </h1>
 
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>CASE ID</th>
-              <th style={thStyle}>THREAT</th>
-              <th style={thStyle}>USER</th>
-              <th style={thStyle}>ANALYST</th>
-              <th style={thStyle}>PRIORITY</th>
-              <th style={thStyle}>STATUS</th>
-            </tr>
-          </thead>
+      <p
+        style={{
+          color: "#94a3b8",
+        }}
+      >
+        Security analysts investigate detected
+        insider-threat incidents.
+      </p>
 
-          <tbody>
-            {investigations.map((i) => (
-              <tr key={i.id}>
-                <td style={tdStyle}>{i.id}</td>
-                <td style={tdStyle}>{i.threat}</td>
-                <td style={tdStyle}>{i.user}</td>
-                <td style={tdStyle}>{i.analyst}</td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(i.priority)}>{i.priority}</span>
-                </td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(i.status)}>{i.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      <div style={cardStyle}>
-        <h2>Investigation Workflow</h2>
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: "25px",
+        }}
+      >
+
+        <h2>
+          Investigation Workflow
+        </h2>
 
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "10px",
+            gap: "15px",
             flexWrap: "wrap",
+            marginTop: "20px",
           }}
         >
-          {[
-            "Alert Generated",
-            "Case Created",
-            "Evidence Reviewed",
-            "Risk Evaluated",
-            "Action Taken",
-            "Case Closed",
-          ].map((step, index) => (
-            <React.Fragment key={step}>
-              <div
-                style={{
-                  padding: "14px",
-                  borderRadius: "8px",
-                  background: "#17223a",
-                  border: "1px solid #33466b",
-                  color: "#60a5fa",
-                }}
-              >
-                {index + 1}. {step}
-              </div>
 
-              {index < 5 && <span>→</span>}
-            </React.Fragment>
-          ))}
+          <WorkflowStep
+            number="1"
+            text="Threat Detected"
+          />
+
+          <WorkflowStep
+            number="2"
+            text="Alert Created"
+          />
+
+          <WorkflowStep
+            number="3"
+            text="Analyst Review"
+          />
+
+          <WorkflowStep
+            number="4"
+            text="Evidence Analysis"
+          />
+
+          <WorkflowStep
+            number="5"
+            text="Incident Resolution"
+          />
+
         </div>
+
       </div>
+
+
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: "20px",
+        }}
+      >
+
+        <h2>
+          Investigation Cases
+        </h2>
+
+        <p
+          style={{
+            color: "#94a3b8",
+          }}
+        >
+          Investigation cases are created when
+          security analysts escalate suspicious
+          threat alerts.
+        </p>
+
+        <div
+          style={{
+            marginTop: "20px",
+            padding: "20px",
+            borderRadius: "8px",
+            background: "#0f172a",
+            border: "1px solid #26344d",
+          }}
+        >
+
+          <strong>
+            Next development step:
+          </strong>
+
+          <p
+            style={{
+              color: "#94a3b8",
+            }}
+          >
+            Connect investigation cases directly
+            to the live threat database.
+          </p>
+
+        </div>
+
+      </div>
+
     </div>
   );
 }
 
-/* ================= REPORTS ================= */
+
+/* =====================================================
+   REPORTS
+===================================================== */
 
 export function Reports() {
+
   return (
+
     <div style={pageStyle}>
-      <Header title="Security Reports & Analytics" />
+
+      <h1>
+        Security Reports
+      </h1>
+
+      <p
+        style={{
+          color: "#94a3b8",
+        }}
+      >
+        Security analytics and insider-threat
+        reporting.
+      </p>
+
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(220px, 1fr))",
           gap: "18px",
-          marginBottom: "25px",
+          marginTop: "25px",
         }}
       >
-        <Stat title="Activities Analyzed" value="1,248" />
-        <Stat title="Threats Detected" value="27" />
-        <Stat title="Average Risk Score" value="38/100" />
+
+        <SummaryCard
+          title="Activities Analyzed"
+          value="1,248"
+          color="#3b82f6"
+        />
+
+        <SummaryCard
+          title="Threats Detected"
+          value="27"
+          color="#ef4444"
+        />
+
+        <SummaryCard
+          title="Average Risk Score"
+          value="38/100"
+          color="#eab308"
+        />
+
+        <SummaryCard
+          title="Critical Incidents"
+          value="5"
+          color="#ef4444"
+        />
+
       </div>
 
-      <div style={cardStyle}>
-        <h2>Risk Distribution</h2>
 
-        {[
-          ["LOW", 64],
-          ["MEDIUM", 21],
-          ["HIGH", 10],
-          ["CRITICAL", 5],
-        ].map(([label, value]) => (
-          <div key={label} style={{ marginBottom: "18px" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "6px",
-              }}
-            >
-              <span>{label}</span>
-              <span>{value}%</span>
-            </div>
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: "25px",
+        }}
+      >
 
-            <div
-              style={{
-                height: "12px",
-                background: "#1e293b",
-                borderRadius: "10px",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${value}%`,
-                  height: "100%",
-                  background:
-                    label === "CRITICAL"
-                      ? "#ef4444"
-                      : label === "HIGH"
-                      ? "#f97316"
-                      : label === "MEDIUM"
-                      ? "#f59e0b"
-                      : "#10b981",
-                }}
-              />
-            </div>
-          </div>
-        ))}
+        <h2>
+          Risk Distribution
+        </h2>
+
+        <div
+          style={{
+            marginTop: "20px",
+          }}
+        >
+
+          <ReportBar
+            label="LOW"
+            value={64}
+            color="#22c55e"
+          />
+
+          <ReportBar
+            label="MEDIUM"
+            value={21}
+            color="#eab308"
+          />
+
+          <ReportBar
+            label="HIGH"
+            value={10}
+            color="#f97316"
+          />
+
+          <ReportBar
+            label="CRITICAL"
+            value={5}
+            color="#ef4444"
+          />
+
+        </div>
+
       </div>
 
-      <div style={cardStyle}>
-        <h2>Generated Reports</h2>
-
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>REPORT</th>
-              <th style={thStyle}>TYPE</th>
-              <th style={thStyle}>PERIOD</th>
-              <th style={thStyle}>STATUS</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td style={tdStyle}>Daily Security Summary</td>
-              <td style={tdStyle}>Security Analytics</td>
-              <td style={tdStyle}>10 Oct 2026</td>
-              <td style={tdStyle}>
-                <span style={badgeStyle("RESOLVED")}>GENERATED</span>
-              </td>
-            </tr>
-
-            <tr>
-              <td style={tdStyle}>Insider Threat Report</td>
-              <td style={tdStyle}>Threat Analysis</td>
-              <td style={tdStyle}>October 2026</td>
-              <td style={tdStyle}>
-                <span style={badgeStyle("RESOLVED")}>GENERATED</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
 
-/* ================= AUDIT LOG ================= */
+
+/* =====================================================
+   AUDIT LOGS
+===================================================== */
 
 export function AuditLogs() {
+
+  const logs = [
+
+    {
+      user: "admin",
+      action: "LOGIN",
+      target: "SentinelFlow",
+      time: "10:42 AM",
+      result: "SUCCESS",
+    },
+
+    {
+      user: "Security Analyst",
+      action: "ALERT_CREATED",
+      target: "Threat Alert",
+      time: "10:23 AM",
+      result: "SUCCESS",
+    },
+
+    {
+      user: "Security Analyst",
+      action: "INVESTIGATION_STARTED",
+      target: "Threat Incident",
+      time: "10:25 AM",
+      result: "SUCCESS",
+    },
+
+    {
+      user: "admin",
+      action: "POLICY_UPDATE",
+      target: "Data Export Policy",
+      time: "09:40 AM",
+      result: "SUCCESS",
+    },
+
+  ];
+
+
   return (
+
     <div style={pageStyle}>
-      <Header title="Audit Log Management" />
 
-      <div style={cardStyle}>
-        <h2>System Audit Trail</h2>
+      <h1>
+        Audit Logs
+      </h1>
 
-        <table style={tableStyle}>
+      <p
+        style={{
+          color: "#94a3b8",
+        }}
+      >
+        Complete accountability trail of
+        security-related system actions.
+      </p>
+
+
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: "25px",
+          overflowX: "auto",
+        }}
+      >
+
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+          }}
+        >
+
           <thead>
+
             <tr>
-              <th style={thStyle}>ID</th>
-              <th style={thStyle}>ACTOR</th>
-              <th style={thStyle}>ACTION</th>
-              <th style={thStyle}>TARGET</th>
-              <th style={thStyle}>TIME</th>
-              <th style={thStyle}>RESULT</th>
+
+              <th style={tableHeaderStyle}>
+                USER
+              </th>
+
+              <th style={tableHeaderStyle}>
+                ACTION
+              </th>
+
+              <th style={tableHeaderStyle}>
+                TARGET
+              </th>
+
+              <th style={tableHeaderStyle}>
+                TIME
+              </th>
+
+              <th style={tableHeaderStyle}>
+                RESULT
+              </th>
+
             </tr>
+
           </thead>
 
+
           <tbody>
-            {auditLogs.map((log) => (
-              <tr key={log.id}>
-                <td style={tdStyle}>{log.id}</td>
-                <td style={tdStyle}>{log.actor}</td>
-                <td style={tdStyle}>{log.action}</td>
-                <td style={tdStyle}>{log.target}</td>
-                <td style={tdStyle}>{log.time}</td>
-                <td style={tdStyle}>
-                  <span style={badgeStyle(log.result)}>{log.result}</span>
-                </td>
-              </tr>
-            ))}
+
+            {logs.map(
+              (log, index) => (
+
+                <tr key={index}>
+
+                  <td style={tableCellStyle}>
+                    {log.user}
+                  </td>
+
+                  <td style={tableCellStyle}>
+                    {log.action}
+                  </td>
+
+                  <td style={tableCellStyle}>
+                    {log.target}
+                  </td>
+
+                  <td style={tableCellStyle}>
+                    {log.time}
+                  </td>
+
+                  <td
+                    style={{
+                      ...tableCellStyle,
+                      color: "#22c55e",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {log.result}
+                  </td>
+
+                </tr>
+
+              )
+            )}
+
           </tbody>
+
         </table>
+
       </div>
+
     </div>
   );
 }
 
-/* ================= STAT ================= */
 
-function Stat({ title, value }) {
+/* =====================================================
+   COMPONENTS
+===================================================== */
+
+function SummaryCard({
+  title,
+  value,
+  color,
+}) {
+
   return (
+
     <div
       style={{
-        background: "#111a2d",
-        border: "1px solid #233252",
-        borderRadius: "12px",
-        padding: "20px",
+        ...cardStyle,
+        borderLeft:
+          `4px solid ${color}`,
       }}
     >
-      <div style={{ color: "#94a3b8", marginBottom: "10px" }}>{title}</div>
-      <div style={{ fontSize: "30px", fontWeight: "700" }}>{value}</div>
+
+      <div
+        style={{
+          color: "#94a3b8",
+          fontSize: "13px",
+          marginBottom: "8px",
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          fontSize: "28px",
+          fontWeight: "800",
+        }}
+      >
+        {value}
+      </div>
+
     </div>
   );
 }
+
+
+function Rule({
+  title,
+  text,
+}) {
+
+  return (
+
+    <div
+      style={{
+        padding: "16px",
+        background: "#0f172a",
+        border: "1px solid #26344d",
+        borderRadius: "8px",
+      }}
+    >
+
+      <strong>
+        {title}
+      </strong>
+
+      <p
+        style={{
+          color: "#94a3b8",
+          fontSize: "13px",
+          lineHeight: "1.5",
+        }}
+      >
+        {text}
+      </p>
+
+    </div>
+  );
+}
+
+
+function WorkflowStep({
+  number,
+  text,
+}) {
+
+  return (
+
+    <div
+      style={{
+        flex: "1 1 150px",
+        padding: "18px",
+        background: "#0f172a",
+        border:
+          "1px solid #26344d",
+        borderRadius: "8px",
+      }}
+    >
+
+      <div
+        style={{
+          width: "30px",
+          height: "30px",
+          borderRadius: "50%",
+          background: "#2563eb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontWeight: "800",
+          marginBottom: "10px",
+        }}
+      >
+        {number}
+      </div>
+
+      {text}
+
+    </div>
+  );
+}
+
+
+function ReportBar({
+  label,
+  value,
+  color,
+}) {
+
+  return (
+
+    <div
+      style={{
+        marginBottom: "18px",
+      }}
+    >
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "7px",
+        }}
+      >
+
+        <span>
+          {label}
+        </span>
+
+        <span
+          style={{
+            color,
+            fontWeight: "700",
+          }}
+        >
+          {value}%
+        </span>
+
+      </div>
+
+
+      <div
+        style={{
+          height: "10px",
+          background: "#1e293b",
+          borderRadius: "10px",
+          overflow: "hidden",
+        }}
+      >
+
+        <div
+          style={{
+            width: `${value}%`,
+            height: "100%",
+            background: color,
+          }}
+        />
+
+      </div>
+
+    </div>
+  );
+}
+
+
+const actionButton = {
+  border: "none",
+  borderRadius: "6px",
+  padding: "8px 12px",
+  background: "#2563eb",
+  color: "#fff",
+  fontSize: "12px",
+  fontWeight: "700",
+  cursor: "pointer",
+};
