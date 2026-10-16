@@ -1,81 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { activitiesAPI } from "../services/api";
 
-const styles = {
-  page: {
-    padding: "30px",
-    minHeight: "100vh",
-    background: "#080d19",
-    color: "#e5e7eb",
-  },
-
-  card: {
-    background: "#131d31",
-    border: "1px solid #26344d",
-    borderRadius: "12px",
-    padding: "22px",
-  },
-
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "12px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    background: "#080f1d",
-    color: "#fff",
-    fontSize: "14px",
-  },
-
-  button: {
-    width: "100%",
-    padding: "13px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#3b82f6",
-    color: "#fff",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-};
-
-function getRiskColor(level) {
-  if (level === "CRITICAL") return "#ef4444";
-  if (level === "HIGH") return "#f97316";
-  if (level === "MEDIUM") return "#eab308";
-  return "#22c55e";
-}
-
 export default function Activities() {
   const [activities, setActivities] = useState([]);
-
-  const [form, setForm] = useState({
-    username: "employee1",
-    activity_type: "FILE_ACCESS",
-    resource: "Financial_Report.pdf",
-    device: "Employee-PC-01",
-    ip_address: "192.168.1.21",
-  });
-
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const loadActivities = async () => {
     try {
       const response = await activitiesAPI.getAll();
 
+      const data = response.data;
+
       setActivities(
-        response.data.activities || []
+        Array.isArray(data)
+          ? data
+          : data.activities || []
       );
+
+      setError("");
     } catch (err) {
       console.error(err);
-
       setError(
-        err.response?.data?.details ||
         err.response?.data?.error ||
-        "Failed to load activities"
+          "Failed to load activities"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,308 +41,333 @@ export default function Activities() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const getRiskClass = (level) => {
+    switch (
+      String(level || "").toUpperCase()
+    ) {
+      case "CRITICAL":
+        return "critical";
 
-  const recordActivity = async (e) => {
-    e.preventDefault();
+      case "HIGH":
+        return "high";
 
-    setLoading(true);
-    setError("");
-    setSuccess("");
+      case "MEDIUM":
+        return "medium";
 
-    try {
-      const response =
-        await activitiesAPI.create(form);
-
-      const created =
-        response.data.activity;
-
-      const threat =
-        response.data.threat;
-
-      setSuccess(
-        threat
-          ? `Activity recorded successfully. ${threat.threat_type} detected with risk score ${threat.risk_score}/100.`
-          : `Activity recorded successfully. Risk score: ${created.risk_score}/100.`
-      );
-
-      await loadActivities();
-
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err.response?.data?.details ||
-        err.response?.data?.error ||
-        err.message ||
-        "Failed to create activity"
-      );
-    } finally {
-      setLoading(false);
+      default:
+        return "low";
     }
   };
 
-  const total = activities.length;
+  const getScoreClass = (score) => {
+    if (score >= 80) return "critical";
+    if (score >= 60) return "high";
+    if (score >= 30) return "medium";
+    return "low";
+  };
 
-  const low = activities.filter(
-    (a) => Number(a.risk_score) < 30
-  ).length;
+  const formatDate = (date) => {
+    if (!date) return "-";
 
-  const medium = activities.filter(
-    (a) =>
-      Number(a.risk_score) >= 30 &&
-      Number(a.risk_score) < 60
-  ).length;
+    return new Date(date).toLocaleString(
+      "en-IN",
+      {
+        dateStyle: "short",
+        timeStyle: "medium",
+      }
+    );
+  };
 
-  const high = activities.filter(
-    (a) =>
-      Number(a.risk_score) >= 60 &&
-      Number(a.risk_score) < 80
-  ).length;
+  const totalActivities =
+    activities.length;
 
-  const critical = activities.filter(
-    (a) => Number(a.risk_score) >= 80
-  ).length;
+  const mlDetected =
+    activities.filter(
+      (item) =>
+        item.ml_anomaly === true ||
+        item.ml_anomaly === "true"
+    ).length;
+
+  const hybridDetected =
+    activities.filter(
+      (item) =>
+        item.detection_method ===
+        "HYBRID_RULE_ML"
+    ).length;
+
+  const criticalActivities =
+    activities.filter(
+      (item) =>
+        String(
+          item.risk_level || ""
+        ).toUpperCase() === "CRITICAL"
+    ).length;
+
+  const averageHybrid =
+    activities.length > 0
+      ? (
+          activities.reduce(
+            (sum, item) =>
+              sum +
+              Number(
+                item.hybrid_risk_score ??
+                  item.risk_score ??
+                  0
+              ),
+            0
+          ) / activities.length
+        ).toFixed(2)
+      : "0.00";
 
   return (
-    <div style={styles.page}>
+    <div
+      style={{
+        padding: "30px",
+        color: "#e2e8f0",
+        minHeight: "100vh",
+        background: "#080d19",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems: "center",
+          marginBottom: "25px",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "28px",
+              color: "#f8fafc",
+            }}
+          >
+            Activity Monitoring
+          </h1>
 
-      {/* HEADER */}
+          <p
+            style={{
+              color: "#64748b",
+              marginTop: "7px",
+            }}
+          >
+            Real-time employee activity
+            and hybrid ML risk analysis
+          </p>
+        </div>
 
-      <div style={{ marginBottom: "25px" }}>
-        <h1
+        <div
           style={{
-            margin: 0,
-            fontSize: "30px",
-            fontWeight: "800",
+            padding: "8px 14px",
+            borderRadius: "20px",
+            border:
+              "1px solid #14532d",
+            background: "#0b1f17",
+            color: "#22c55e",
+            fontSize: "12px",
+            fontWeight: 700,
           }}
         >
-          Activity Monitoring
-        </h1>
-
-        <p
-          style={{
-            color: "#94a3b8",
-            marginTop: "8px",
-          }}
-        >
-          Monitor employee activities and automatically
-          assess insider-threat risk.
-        </p>
+          ● LIVE MONITORING
+        </div>
       </div>
 
-      {/* SUMMARY */}
+      {error && (
+        <div
+          style={{
+            background: "#35151a",
+            border:
+              "1px solid #7f1d1d",
+            color: "#f87171",
+            padding: "14px",
+            borderRadius: "8px",
+            marginBottom: "20px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* =====================================================
+          SUMMARY CARDS
+      ===================================================== */}
 
       <div
         style={{
           display: "grid",
           gridTemplateColumns:
             "repeat(5, 1fr)",
-          gap: "16px",
+          gap: "15px",
           marginBottom: "25px",
         }}
       >
-        <Summary
+        <SummaryCard
           title="Total Activities"
-          value={total}
-          color="#3b82f6"
+          value={totalActivities}
+          subtitle="Live database records"
         />
 
-        <Summary
-          title="Low Risk"
-          value={low}
-          color="#22c55e"
+        <SummaryCard
+          title="ML Anomalies"
+          value={mlDetected}
+          subtitle="Isolation Forest"
+          accent="#f59e0b"
         />
 
-        <Summary
-          title="Medium Risk"
-          value={medium}
-          color="#eab308"
+        <SummaryCard
+          title="Hybrid Detected"
+          value={hybridDetected}
+          subtitle="Rule + ML"
+          accent="#8b5cf6"
         />
 
-        <Summary
-          title="High Risk"
-          value={high}
-          color="#f97316"
-        />
-
-        <Summary
+        <SummaryCard
           title="Critical"
-          value={critical}
-          color="#ef4444"
+          value={criticalActivities}
+          subtitle="High-priority activity"
+          accent="#ef4444"
+        />
+
+        <SummaryCard
+          title="Avg Hybrid Risk"
+          value={`${averageHybrid}/100`}
+          subtitle="Final risk score"
+          accent="#60a5fa"
         />
       </div>
 
-      {/* RECORD */}
+      {/* =====================================================
+          ML PIPELINE
+      ===================================================== */}
 
       <div
         style={{
-          ...styles.card,
+          background: "#0b1220",
+          border:
+            "1px solid #26344d",
+          borderRadius: "10px",
+          padding: "20px",
           marginBottom: "25px",
         }}
       >
-        <h2
+        <div
           style={{
-            marginTop: 0,
+            display: "flex",
+            justifyContent:
+              "space-between",
+            alignItems: "center",
+            marginBottom: "18px",
           }}
         >
-          Simulate / Record Activity
-        </h2>
-
-        <form
-          onSubmit={recordActivity}
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1fr",
-            gap: "14px",
-            alignItems: "end",
-          }}
-        >
-
-          <Field
-            label="Username"
-            name="username"
-            value={form.username}
-            onChange={handleChange}
-          />
-
           <div>
-            <label
+            <h2
               style={{
-                display: "block",
-                color: "#94a3b8",
-                fontSize: "12px",
-                marginBottom: "7px",
+                margin: 0,
+                fontSize: "16px",
+                color: "#f8fafc",
               }}
             >
-              Activity Type
-            </label>
+              Hybrid Detection Pipeline
+            </h2>
 
-            <select
-              name="activity_type"
-              value={form.activity_type}
-              onChange={handleChange}
-              style={styles.input}
+            <p
+              style={{
+                margin:
+                  "5px 0 0",
+                color: "#64748b",
+                fontSize: "12px",
+              }}
             >
-              <option value="LOGIN">
-                LOGIN
-              </option>
-
-              <option value="FILE_ACCESS">
-                FILE_ACCESS
-              </option>
-
-              <option value="FAILED_LOGIN">
-                FAILED_LOGIN
-              </option>
-
-              <option value="DATA_EXPORT">
-                DATA_EXPORT
-              </option>
-            </select>
+              Rule-based security policies
+              combined with Isolation Forest
+              anomaly detection
+            </p>
           </div>
 
-          <Field
-            label="Resource"
-            name="resource"
-            value={form.resource}
-            onChange={handleChange}
-          />
-
-          <Field
-            label="Device"
-            name="device"
-            value={form.device}
-            onChange={handleChange}
-          />
-
-          <Field
-            label="IP Address"
-            name="ip_address"
-            value={form.ip_address}
-            onChange={handleChange}
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              ...styles.button,
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            {loading
-              ? "Recording..."
-              : "Record Activity"}
-          </button>
-
-        </form>
-
-        {error && (
           <div
             style={{
-              marginTop: "15px",
-              padding: "14px",
-              background: "#450a0a",
-              border: "1px solid #991b1b",
-              borderRadius: "8px",
-              color: "#fecaca",
+              color: "#60a5fa",
+              fontSize: "12px",
+              fontWeight: 700,
             }}
           >
-            <strong>
-              Backend Error:
-            </strong>
-
-            <br />
-
-            {error}
+            ML ENGINE ONLINE
           </div>
-        )}
+        </div>
 
-        {success && (
-          <div
-            style={{
-              marginTop: "15px",
-              padding: "14px",
-              background: "#052e16",
-              border: "1px solid #166534",
-              borderRadius: "8px",
-              color: "#86efac",
-            }}
-          >
-            ✓ {success}
-          </div>
-        )}
-      </div>
-
-      {/* ACTIVITY TABLE */}
-
-      <div style={styles.card}>
-
-        <h2
+        <div
           style={{
-            marginTop: 0,
-            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
           }}
         >
-          Activity Log
-        </h2>
+          <PipelineBox text="Activity" />
+          <Arrow />
+          <PipelineBox text="Rule Engine" />
+          <Arrow />
+          <PipelineBox text="Isolation Forest" />
+          <Arrow />
+          <PipelineBox text="Hybrid Risk" />
+          <Arrow />
+          <PipelineBox text="Threat Detection" />
+        </div>
+      </div>
 
-        {activities.length === 0 ? (
-          <div
+      {/* =====================================================
+          ACTIVITY TABLE
+      ===================================================== */}
+
+      <div
+        style={{
+          background: "#0b1220",
+          border:
+            "1px solid #26344d",
+          borderRadius: "10px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "18px 20px",
+            borderBottom:
+              "1px solid #26344d",
+          }}
+        >
+          <h2
             style={{
-              textAlign: "center",
-              padding: "45px",
-              color: "#94a3b8",
+              margin: 0,
+              fontSize: "16px",
+              color: "#f8fafc",
             }}
           >
-            No activities recorded yet.
+            Live Activity Stream
+          </h2>
+        </div>
+
+        {loading ? (
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "#64748b",
+            }}
+          >
+            Loading activity data...
+          </div>
+        ) : activities.length === 0 ? (
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "#64748b",
+            }}
+          >
+            No activities found.
           </div>
         ) : (
           <div
@@ -402,221 +378,399 @@ export default function Activities() {
             <table
               style={{
                 width: "100%",
-                borderCollapse: "collapse",
+                borderCollapse:
+                  "collapse",
+                minWidth: "1200px",
               }}
             >
-
               <thead>
-                <tr>
-                  <th style={th}>
-                    USER
-                  </th>
-
-                  <th style={th}>
-                    ACTIVITY
-                  </th>
-
-                  <th style={th}>
-                    RESOURCE
-                  </th>
-
-                  <th style={th}>
-                    DEVICE
-                  </th>
-
-                  <th style={th}>
-                    IP ADDRESS
-                  </th>
-
-                  <th style={th}>
-                    RISK
-                  </th>
-
-                  <th style={th}>
-                    LEVEL
-                  </th>
-
-                  <th style={th}>
-                    STATUS
-                  </th>
-
-                  <th style={th}>
-                    TIME
-                  </th>
+                <tr
+                  style={{
+                    background:
+                      "#0f172a",
+                  }}
+                >
+                  {[
+                    "ID",
+                    "User",
+                    "Activity",
+                    "Resource",
+                    "Device",
+                    "Rule Score",
+                    "ML Score",
+                    "Hybrid Score",
+                    "ML",
+                    "Risk",
+                    "Detection",
+                    "Time",
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      style={{
+                        textAlign: "left",
+                        padding:
+                          "13px 12px",
+                        color:
+                          "#64748b",
+                        fontSize:
+                          "11px",
+                        fontWeight:
+                          700,
+                        textTransform:
+                          "uppercase",
+                        letterSpacing:
+                          "0.5px",
+                        whiteSpace:
+                          "nowrap",
+                      }}
+                    >
+                      {heading}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody>
+                {activities.map(
+                  (activity) => {
+                    const ruleScore =
+                      Number(
+                        activity.rule_risk_score ??
+                          0
+                      );
 
-                {activities.map((activity) => {
+                    const mlScore =
+                      Number(
+                        activity.ml_anomaly_score ??
+                          0
+                      );
 
-                  const score =
-                    Number(
-                      activity.risk_score || 0
-                    );
+                    const hybridScore =
+                      Number(
+                        activity.hybrid_risk_score ??
+                          activity.risk_score ??
+                          0
+                      );
 
-                  const level =
-                    activity.risk_level ||
-                    (score >= 80
-                      ? "CRITICAL"
-                      : score >= 60
-                      ? "HIGH"
-                      : score >= 30
-                      ? "MEDIUM"
-                      : "LOW");
+                    const mlPercent =
+                      mlScore <= 1
+                        ? Math.round(
+                            mlScore * 100
+                          )
+                        : Math.round(
+                            mlScore
+                          );
 
-                  const color =
-                    getRiskColor(level);
+                    const isML =
+                      activity.ml_anomaly ===
+                        true ||
+                      activity.ml_anomaly ===
+                        "true";
 
-                  return (
-                    <tr key={activity.id}>
+                    return (
+                      <tr
+                        key={
+                          activity.id
+                        }
+                        style={{
+                          borderTop:
+                            "1px solid #1e293b",
+                        }}
+                      >
+                        <td
+                          style={cellStyle}
+                        >
+                          #{activity.id}
+                        </td>
 
-                      <td style={td}>
-                        {activity.username}
-                      </td>
-
-                      <td style={td}>
-                        <span
+                        <td
                           style={{
-                            padding:
-                              "5px 9px",
-                            borderRadius:
-                              "999px",
-                            background:
-                              "#3b2a0a",
+                            ...cellStyle,
                             color:
-                              "#fbbf24",
-                            fontSize:
-                              "11px",
-                            fontWeight:
-                              "700",
+                              "#f8fafc",
+                            fontWeight: 700,
                           }}
                         >
-                          {activity.activity_type}
-                        </span>
-                      </td>
+                          {
+                            activity.username
+                          }
+                        </td>
 
-                      <td style={td}>
-                        {activity.resource}
-                      </td>
+                        <td
+                          style={{
+                            ...cellStyle,
+                            color:
+                              "#60a5fa",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {
+                            activity.activity_type
+                          }
+                        </td>
 
-                      <td style={td}>
-                        {activity.device}
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          {
+                            activity.resource ||
+                            "-"
+                          }
+                        </td>
 
-                      <td style={td}>
-                        {activity.ip_address}
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          {
+                            activity.device ||
+                            "-"
+                          }
+                        </td>
 
-                      <td
-                        style={{
-                          ...td,
-                          color,
-                          fontWeight: "800",
-                        }}
-                      >
-                        {score}/100
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <ScoreBadge
+                            score={
+                              ruleScore
+                            }
+                          />
+                        </td>
 
-                      <td
-                        style={{
-                          ...td,
-                          color,
-                          fontWeight: "800",
-                        }}
-                      >
-                        {level}
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <ScoreBadge
+                            score={
+                              mlPercent
+                            }
+                          />
+                        </td>
 
-                      <td style={td}>
-                        {activity.status}
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <ScoreBadge
+                            score={
+                              hybridScore
+                            }
+                          />
+                        </td>
 
-                      <td style={td}>
-                        {new Date(
-                          activity.created_at
-                        ).toLocaleString()}
-                      </td>
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <span
+                            style={{
+                              padding:
+                                "4px 8px",
+                              borderRadius:
+                                "12px",
+                              fontSize:
+                                "10px",
+                              fontWeight:
+                                800,
+                              color:
+                                isML
+                                  ? "#f59e0b"
+                                  : "#64748b",
+                              background:
+                                isML
+                                  ? "#2d2108"
+                                  : "#111827",
+                              border:
+                                `1px solid ${
+                                  isML
+                                    ? "#92400e"
+                                    : "#334155"
+                                }`,
+                            }}
+                          >
+                            {isML
+                              ? "ANOMALY"
+                              : "NORMAL"}
+                          </span>
+                        </td>
 
-                    </tr>
-                  );
-                })}
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <span
+                            style={{
+                              padding:
+                                "5px 9px",
+                              borderRadius:
+                                "12px",
+                              fontSize:
+                                "10px",
+                              fontWeight:
+                                800,
+                              color:
+                                riskColor(
+                                  activity.risk_level
+                                ),
+                              background:
+                                riskBackground(
+                                  activity.risk_level
+                                ),
+                            }}
+                          >
+                            {
+                              activity.risk_level ||
+                              "LOW"
+                            }
+                          </span>
+                        </td>
 
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <span
+                            style={{
+                              fontSize:
+                                "10px",
+                              color:
+                                activity.detection_method ===
+                                "HYBRID_RULE_ML"
+                                  ? "#a78bfa"
+                                  : "#94a3b8",
+                              fontWeight:
+                                700,
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {
+                              activity.detection_method ===
+                              "HYBRID_RULE_ML"
+                                ? "RULE + ML"
+                                : "RULE"
+                            }
+                          </span>
+                        </td>
+
+                        <td
+                          style={{
+                            ...cellStyle,
+                            whiteSpace:
+                              "nowrap",
+                            color:
+                              "#64748b",
+                          }}
+                        >
+                          {formatDate(
+                            activity.created_at
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
               </tbody>
-
             </table>
           </div>
         )}
       </div>
 
-      {/* LEGEND */}
+      {/* =====================================================
+          EXPLANATION
+      ===================================================== */}
 
       <div
         style={{
-          ...styles.card,
           marginTop: "20px",
+          padding: "18px 20px",
+          background: "#0b1220",
+          border:
+            "1px solid #26344d",
+          borderRadius: "10px",
         }}
       >
-        <strong>
-          Risk Scoring:
-        </strong>
+        <h3
+          style={{
+            margin:
+              "0 0 10px",
+            fontSize: "14px",
+            color: "#f8fafc",
+          }}
+        >
+          Detection Methodology
+        </h3>
 
         <div
           style={{
-            display: "flex",
-            gap: "30px",
-            marginTop: "15px",
-            flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(3, 1fr)",
+            gap: "15px",
           }}
         >
-          <Legend
-            color="#22c55e"
-            text="LOW (0–29)"
+          <MethodCard
+            title="Rule Risk"
+            description="Explainable security policies evaluate known suspicious activities such as failed logins, sensitive file access and data exports."
           />
 
-          <Legend
-            color="#eab308"
-            text="MEDIUM (30–59)"
+          <MethodCard
+            title="ML Anomaly"
+            description="Isolation Forest evaluates behavioural deviations using temporal, activity, device, resource and frequency features."
           />
 
-          <Legend
-            color="#f97316"
-            text="HIGH (60–79)"
-          />
-
-          <Legend
-            color="#ef4444"
-            text="CRITICAL (80–100)"
+          <MethodCard
+            title="Hybrid Risk"
+            description="The final risk combines the rule score and ML anomaly score before triggering threat detection."
           />
         </div>
       </div>
-
     </div>
   );
 }
 
 
-/* =====================================================
-   SMALL COMPONENTS
-===================================================== */
+// ============================================================
+// COMPONENTS
+// ============================================================
 
-function Summary({
+function SummaryCard({
   title,
   value,
-  color,
+  subtitle,
+  accent = "#60a5fa",
 }) {
   return (
     <div
       style={{
-        ...styles.card,
-        borderLeft:
-          `4px solid ${color}`,
+        background: "#0b1220",
+        border:
+          "1px solid #26344d",
+        borderRadius: "9px",
+        padding: "18px",
+        borderTop:
+          `2px solid ${accent}`,
       }}
     >
       <div
         style={{
-          color: "#94a3b8",
-          fontSize: "13px",
+          color: "#64748b",
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform:
+            "uppercase",
         }}
       >
         {title}
@@ -624,88 +778,180 @@ function Summary({
 
       <div
         style={{
-          marginTop: "10px",
-          fontSize: "28px",
-          fontWeight: "800",
+          color: "#f8fafc",
+          fontSize: "25px",
+          fontWeight: 800,
+          marginTop: "7px",
         }}
       >
         {value}
+      </div>
+
+      <div
+        style={{
+          color: "#64748b",
+          fontSize: "10px",
+          marginTop: "4px",
+        }}
+      >
+        {subtitle}
+      </div>
+    </div>
+  );
+}
+
+function ScoreBadge({ score }) {
+  const value = Number(score) || 0;
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        minWidth: "38px",
+        textAlign: "center",
+        padding: "4px 7px",
+        borderRadius: "5px",
+        fontSize: "11px",
+        fontWeight: 800,
+        color: riskColor(
+          value >= 80
+            ? "CRITICAL"
+            : value >= 60
+            ? "HIGH"
+            : value >= 30
+            ? "MEDIUM"
+            : "LOW"
+        ),
+        background:
+          riskBackground(
+            value >= 80
+              ? "CRITICAL"
+              : value >= 60
+              ? "HIGH"
+              : value >= 30
+              ? "MEDIUM"
+              : "LOW"
+          ),
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
+function PipelineBox({ text }) {
+  return (
+    <div
+      style={{
+        padding: "10px 14px",
+        background: "#111b2e",
+        border:
+          "1px solid #334155",
+        borderRadius: "7px",
+        color: "#cbd5e1",
+        fontSize: "11px",
+        fontWeight: 700,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function Arrow() {
+  return (
+    <span
+      style={{
+        color: "#3b82f6",
+        fontSize: "18px",
+      }}
+    >
+      →
+    </span>
+  );
+}
+
+function MethodCard({
+  title,
+  description,
+}) {
+  return (
+    <div
+      style={{
+        padding: "14px",
+        background: "#0f172a",
+        border:
+          "1px solid #1e293b",
+        borderRadius: "7px",
+      }}
+    >
+      <div
+        style={{
+          color: "#60a5fa",
+          fontSize: "12px",
+          fontWeight: 800,
+          marginBottom: "6px",
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          color: "#94a3b8",
+          fontSize: "11px",
+          lineHeight: 1.6,
+        }}
+      >
+        {description}
       </div>
     </div>
   );
 }
 
 
-function Field({
-  label,
-  name,
-  value,
-  onChange,
-}) {
-  return (
-    <div>
-      <label
-        style={{
-          display: "block",
-          color: "#94a3b8",
-          fontSize: "12px",
-          marginBottom: "7px",
-        }}
-      >
-        {label}
-      </label>
+// ============================================================
+// STYLES / HELPERS
+// ============================================================
 
-      <input
-        name={name}
-        value={value}
-        onChange={onChange}
-        style={styles.input}
-      />
-    </div>
-  );
-}
-
-
-function Legend({
-  color,
-  text,
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        color,
-      }}
-    >
-      <span
-        style={{
-          width: "10px",
-          height: "10px",
-          borderRadius: "50%",
-          background: color,
-        }}
-      />
-
-      {text}
-    </div>
-  );
-}
-
-
-const th = {
-  textAlign: "left",
-  padding: "13px",
+const cellStyle = {
+  padding: "13px 12px",
   color: "#94a3b8",
   fontSize: "11px",
-  borderBottom:
-    "1px solid #26344d",
 };
 
-const td = {
-  padding: "14px 13px",
-  borderBottom:
-    "1px solid #1e293b",
-  fontSize: "13px",
-};
+function riskColor(level) {
+  switch (
+    String(level || "").toUpperCase()
+  ) {
+    case "CRITICAL":
+      return "#f87171";
+
+    case "HIGH":
+      return "#fb923c";
+
+    case "MEDIUM":
+      return "#facc15";
+
+    default:
+      return "#4ade80";
+  }
+}
+
+function riskBackground(level) {
+  switch (
+    String(level || "").toUpperCase()
+  ) {
+    case "CRITICAL":
+      return "#35151a";
+
+    case "HIGH":
+      return "#2d1b0d";
+
+    case "MEDIUM":
+      return "#2a2508";
+
+    default:
+      return "#0b1f17";
+  }
+}

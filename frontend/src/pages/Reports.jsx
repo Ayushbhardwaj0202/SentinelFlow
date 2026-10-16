@@ -1,74 +1,187 @@
-import React, { useEffect, useState } from "react";
-import { reportsAPI } from "../services/api";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  activitiesAPI,
+  threatsAPI,
+  reportsAPI,
+} from "../services/api";
 
 export default function Reports() {
-  const [analytics, setAnalytics] =
-    useState(null);
-
-  const [reports, setReports] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [generating, setGenerating] =
-    useState(false);
-
-  const [selectedReport, setSelectedReport] =
-    useState(null);
+  const [activities, setActivities] = useState([]);
+  const [threats, setThreats] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [message, setMessage] = useState("");
 
   const loadData = async () => {
+    // Activities
     try {
-      const analyticsResponse =
-        await reportsAPI.getAll();
+      const response = await activitiesAPI.getAll();
 
-      const reportsResponse =
-        await reportsAPI.getGenerated();
+      const data =
+        response.data?.activities ||
+        response.data?.data ||
+        (Array.isArray(response.data)
+          ? response.data
+          : []);
 
-      setAnalytics(
-        analyticsResponse.data
-      );
-
-      setReports(
-        reportsResponse.data.reports || []
-      );
+      setActivities(data);
     } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+      console.error("Activities loading error:", error);
     }
+
+    // Threats
+    try {
+      const response = await threatsAPI.getAll();
+
+      const data =
+        response.data?.threats ||
+        response.data?.data ||
+        (Array.isArray(response.data)
+          ? response.data
+          : []);
+
+      setThreats(data);
+    } catch (error) {
+      console.error("Threats loading error:", error);
+    }
+
+    // Generated reports
+    try {
+      const response = await reportsAPI.getGenerated();
+
+      const data =
+        response.data?.reports ||
+        response.data?.data ||
+        (Array.isArray(response.data)
+          ? response.data
+          : []);
+
+      setReports(data);
+    } catch (error) {
+      console.error(
+        "Generated reports loading error:",
+        error
+      );
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
     loadData();
 
-    const timer = setInterval(
-      loadData,
-      10000
-    );
+    const timer = setInterval(loadData, 5000);
 
     return () => clearInterval(timer);
   }, []);
 
+  const stats = useMemo(() => {
+    const totalActivities = activities.length;
+    const totalThreats = threats.length;
+
+    const mlAnomalies = activities.filter(
+      (a) =>
+        a.ml_anomaly === true ||
+        a.ml_anomaly === "true" ||
+        a.ml_anomaly === 1
+    ).length;
+
+    const hybridDetections = activities.filter(
+      (a) =>
+        a.detection_method === "HYBRID_RULE_ML"
+    ).length;
+
+    const ruleOnly = activities.filter(
+      (a) =>
+        a.detection_method === "RULE_ENGINE"
+    ).length;
+
+    const criticalThreats = threats.filter(
+      (t) => t.severity === "CRITICAL"
+    ).length;
+
+    const highThreats = threats.filter(
+      (t) => t.severity === "HIGH"
+    ).length;
+
+    const mlScores = activities
+      .map((a) => Number(a.ml_anomaly_score))
+      .filter((x) => Number.isFinite(x));
+
+    const hybridScores = activities
+      .map((a) => Number(a.hybrid_risk_score))
+      .filter((x) => Number.isFinite(x));
+
+    const averageMLScore =
+      mlScores.length > 0
+        ? (
+            (mlScores.reduce((a, b) => a + b, 0) /
+              mlScores.length) *
+            100
+          ).toFixed(1)
+        : "0.0";
+
+    const averageHybridRisk =
+      hybridScores.length > 0
+        ? (
+            hybridScores.reduce(
+              (a, b) => a + b,
+              0
+            ) / hybridScores.length
+          ).toFixed(1)
+        : "0.0";
+
+    const anomalyRate =
+      totalActivities > 0
+        ? (
+            (mlAnomalies / totalActivities) *
+            100
+          ).toFixed(1)
+        : "0.0";
+
+    const mlThreats = threats.filter(
+      (t) =>
+        t.detection_method ===
+          "HYBRID_RULE_ML" ||
+        Number(t.ml_anomaly_score) > 0
+    ).length;
+
+    return {
+      totalActivities,
+      totalThreats,
+      mlAnomalies,
+      hybridDetections,
+      ruleOnly,
+      criticalThreats,
+      highThreats,
+      averageMLScore,
+      averageHybridRisk,
+      anomalyRate,
+      mlThreats,
+    };
+  }, [activities, threats]);
+
   const generateReport = async () => {
     try {
       setGenerating(true);
+      setMessage("");
 
-      const response =
-        await reportsAPI.generate({
-          generated_by:
-            "Security Analyst",
-        });
+      await reportsAPI.generate({
+        report_type: "SECURITY_RISK_ANALYSIS",
+      });
 
-      setSelectedReport(
-        response.data.report
+      setMessage(
+        "Security report generated successfully."
       );
 
       await loadData();
     } catch (error) {
-      alert(
+      console.error(error);
+
+      setMessage(
         error.response?.data?.error ||
-          "Failed to generate report"
+          "Failed to generate report."
       );
     } finally {
       setGenerating(false);
@@ -77,69 +190,34 @@ export default function Reports() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          padding: "40px",
-          color: "#e5e7eb",
-        }}
-      >
-        Loading Security Reports...
+      <div style={page}>
+        <h1>Security Reports</h1>
+        <p style={muted}>
+          Loading security analytics...
+        </p>
       </div>
     );
   }
 
-  const summary =
-    analytics?.summary || {};
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#080d19",
-        color: "#e5e7eb",
-        padding: "30px",
-      }}
-    >
+    <div style={page}>
+
       {/* HEADER */}
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-          alignItems: "center",
-        }}
-      >
+      <div style={header}>
         <div>
-          <h1>
-            Security Reports
-          </h1>
+          <h1>Security Reports</h1>
 
-          <p
-            style={{
-              color: "#94a3b8",
-            }}
-          >
-            Generate live security risk
-            assessment reports from
-            SentinelFlow data.
+          <p style={muted}>
+            Security intelligence, risk analytics and
+            machine-learning detection performance.
           </p>
         </div>
 
         <button
           onClick={generateReport}
           disabled={generating}
-          style={{
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            padding: "13px 22px",
-            fontWeight: "700",
-            cursor: generating
-              ? "wait"
-              : "pointer",
-          }}
+          style={button}
         >
           {generating
             ? "Generating..."
@@ -147,374 +225,631 @@ export default function Reports() {
         </button>
       </div>
 
-      {/* LIVE ANALYTICS */}
+      {message && (
+        <div style={messageBox}>
+          {message}
+        </div>
+      )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(4, 1fr)",
-          gap: "18px",
-          marginTop: "30px",
-        }}
-      >
+      {/* SECURITY OVERVIEW */}
+
+      <h2>Security Overview</h2>
+
+      <div style={grid4}>
         <Card
           title="Activities Analyzed"
-          value={
-            summary.activitiesAnalyzed ||
-            0
-          }
+          value={stats.totalActivities}
+          color="#3b82f6"
         />
 
         <Card
           title="Threats Detected"
-          value={
-            summary.threatsDetected ||
-            0
-          }
+          value={stats.totalThreats}
+          color="#ef4444"
         />
 
         <Card
-          title="Open Threats"
-          value={
-            summary.openThreats ||
-            0
-          }
+          title="Critical Threats"
+          value={stats.criticalThreats}
+          color="#dc2626"
         />
 
         <Card
-          title="Average Risk"
-          value={`${
-            summary.averageRiskScore ||
-            0
-          }/100`}
+          title="High Threats"
+          value={stats.highThreats}
+          color="#f97316"
         />
       </div>
 
-      {/* GENERATED REPORT */}
+      {/* ML ANALYTICS */}
 
-      {selectedReport && (
-        <div
-          style={{
-            marginTop: "30px",
-            background: "#131d31",
-            border:
-              "1px solid #3b82f6",
-            borderRadius: "12px",
-            padding: "28px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent:
-                "space-between",
-            }}
-          >
-            <div>
-              <h2>
-                Security Risk Assessment
-              </h2>
+      <h2>Machine Learning Analytics</h2>
 
-              <p
-                style={{
-                  color: "#60a5fa",
-                  fontWeight: "700",
-                }}
-              >
-                {
-                  selectedReport.report_number
-                }
-              </p>
-            </div>
+      <div style={grid4}>
+        <Card
+          title="ML Anomalies"
+          value={stats.mlAnomalies}
+          subtitle={`${stats.anomalyRate}% anomaly rate`}
+          color="#06b6d4"
+        />
 
-            <span
-              style={{
-                color: "#22c55e",
-                fontWeight: "700",
-              }}
-            >
-              REPORT GENERATED
-            </span>
-          </div>
+        <Card
+          title="Hybrid Detections"
+          value={stats.hybridDetections}
+          subtitle="Rule + Isolation Forest"
+          color="#8b5cf6"
+        />
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(4, 1fr)",
-              gap: "15px",
-              margin:
-                "20px 0",
-            }}
-          >
-            <MiniStat
-              label="Activities"
-              value={
-                selectedReport.activities_analyzed
-              }
-            />
+        <Card
+          title="Average ML Score"
+          value={`${stats.averageMLScore}%`}
+          subtitle="Anomaly signal"
+          color="#14b8a6"
+        />
 
-            <MiniStat
-              label="Threats"
-              value={
-                selectedReport.threats_detected
-              }
-            />
+        <Card
+          title="ML-Assisted Threats"
+          value={stats.mlThreats}
+          subtitle="Threat alerts"
+          color="#f43f5e"
+        />
+      </div>
 
-            <MiniStat
-              label="Critical"
-              value={
-                selectedReport.critical_threats
-              }
-            />
+      {/* ARCHITECTURE */}
 
-            <MiniStat
-              label="Risk Score"
-              value={`${selectedReport.average_risk_score}/100`}
-            />
-          </div>
+      <div style={panel}>
+        <h2>Hybrid Detection Architecture</h2>
 
-          <Section
-            title="Risk Assessment"
-            text={
-              selectedReport.risk_summary
-            }
+        <div style={pipeline}>
+          <Step n="1" title="Activity" text="User behaviour" />
+          <Arrow />
+          <Step n="2" title="Rule Engine" text="Known threats" />
+          <Arrow />
+          <Step
+            n="3"
+            title="Isolation Forest"
+            text="Anomaly detection"
           />
-
-          <Section
-            title="Threat Summary"
-            text={
-              selectedReport.threat_summary
-            }
-          />
-
-          <Section
-            title="Investigation Summary"
-            text={
-              selectedReport.investigation_summary
-            }
-          />
-
-          <Section
-            title="Security Recommendations"
-            text={
-              selectedReport.recommendations
-            }
-          />
-
-          <p
-            style={{
-              color: "#64748b",
-              marginTop: "25px",
-              fontSize: "12px",
-            }}
-          >
-            Generated by{" "}
-            {
-              selectedReport.generated_by
-            }{" "}
-            on{" "}
-            {new Date(
-              selectedReport.created_at
-            ).toLocaleString()}
-          </p>
+          <Arrow />
+          <Step n="4" title="Hybrid Risk" text="Combined score" />
+          <Arrow />
+          <Step n="5" title="Threat Alert" text="Security response" />
         </div>
-      )}
+      </div>
 
-      {/* PREVIOUS REPORTS */}
+      {/* DETECTION BREAKDOWN */}
 
-      <div
-        style={{
-          marginTop: "30px",
-          background: "#131d31",
-          border:
-            "1px solid #26344d",
-          borderRadius: "12px",
-          padding: "25px",
-        }}
-      >
-        <h2>
-          Generated Reports
-        </h2>
+      <div style={twoColumns}>
 
+        <div style={panel}>
+          <h2>Detection Method Breakdown</h2>
+
+          <Progress
+            label="Hybrid Rule + ML"
+            value={stats.hybridDetections}
+            total={stats.totalActivities}
+          />
+
+          <Progress
+            label="Rule Engine Only"
+            value={stats.ruleOnly}
+            total={stats.totalActivities}
+          />
+
+          <Progress
+            label="ML Anomalies"
+            value={stats.mlAnomalies}
+            total={stats.totalActivities}
+          />
+        </div>
+
+        <div style={panel}>
+          <h2>Risk Intelligence</h2>
+
+          <Info
+            label="Average Hybrid Risk"
+            value={`${stats.averageHybridRisk}/100`}
+          />
+
+          <Info
+            label="ML Anomaly Rate"
+            value={`${stats.anomalyRate}%`}
+          />
+
+          <Info
+            label="ML-Assisted Threats"
+            value={stats.mlThreats}
+          />
+
+          <Info
+            label="Total Security Events"
+            value={stats.totalActivities}
+          />
+        </div>
+
+      </div>
+
+      {/* ACTIVITY ANALYSIS */}
+
+      <h2>ML Activity Analysis</h2>
+
+      <div style={panel}>
+        <div style={scroll}>
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>USER</th>
+                <th style={th}>ACTIVITY</th>
+                <th style={th}>RULE SCORE</th>
+                <th style={th}>ML SCORE</th>
+                <th style={th}>HYBRID</th>
+                <th style={th}>ML STATUS</th>
+                <th style={th}>DETECTION</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {activities.map((a) => (
+                <tr key={a.id}>
+                  <td style={td}>
+                    {a.username}
+                  </td>
+
+                  <td style={td}>
+                    {a.activity_type}
+                  </td>
+
+                  <td style={td}>
+                    {a.rule_risk_score ??
+                      a.risk_score ??
+                      0}
+                  </td>
+
+                  <td style={td}>
+                    {Number.isFinite(
+                      Number(a.ml_anomaly_score)
+                    )
+                      ? `${(
+                          Number(
+                            a.ml_anomaly_score
+                          ) * 100
+                        ).toFixed(1)}%`
+                      : "N/A"}
+                  </td>
+
+                  <td
+                    style={{
+                      ...td,
+                      fontWeight: "800",
+                    }}
+                  >
+                    {a.hybrid_risk_score ??
+                      a.risk_score ??
+                      0}
+                  </td>
+
+                  <td style={td}>
+                    {a.ml_anomaly ? (
+                      <span style={danger}>
+                        ANOMALY
+                      </span>
+                    ) : (
+                      <span style={success}>
+                        NORMAL
+                      </span>
+                    )}
+                  </td>
+
+                  <td style={td}>
+                    {a.detection_method ===
+                    "HYBRID_RULE_ML" ? (
+                      <span style={info}>
+                        RULE + ML
+                      </span>
+                    ) : (
+                      "RULE ENGINE"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* THREAT ANALYSIS */}
+
+      <h2>Threat Intelligence</h2>
+
+      <div style={panel}>
+        <div style={scroll}>
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>THREAT</th>
+                <th style={th}>USER</th>
+                <th style={th}>SEVERITY</th>
+                <th style={th}>RISK</th>
+                <th style={th}>STATUS</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {threats.map((t) => (
+                <tr key={t.id}>
+                  <td style={td}>
+                    {t.threat_type}
+                  </td>
+
+                  <td style={td}>
+                    {t.username}
+                  </td>
+
+                  <td style={td}>
+                    <Severity level={t.severity} />
+                  </td>
+
+                  <td style={td}>
+                    {t.risk_score}/100
+                  </td>
+
+                  <td style={td}>
+                    {t.status}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* GENERATED REPORTS */}
+
+      <h2>Generated Security Reports</h2>
+
+      <div style={panel}>
         {reports.length === 0 ? (
-          <p
-            style={{
-              color: "#94a3b8",
-            }}
-          >
-            No security reports generated
-            yet.
+          <p style={muted}>
+            No generated reports yet.
           </p>
         ) : (
-          reports.map((report) => (
-            <div
-              key={report.id}
-              style={{
-                display: "flex",
-                justifyContent:
-                  "space-between",
-                alignItems: "center",
-                padding:
-                  "15px 0",
-                borderBottom:
-                  "1px solid #26344d",
-              }}
-            >
-              <div>
-                <strong>
-                  {
-                    report.report_number
-                  }
-                </strong>
+          <div style={scroll}>
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>REPORT</th>
+                  <th style={th}>TYPE</th>
+                  <th style={th}>ACTIVITIES</th>
+                  <th style={th}>THREATS</th>
+                  <th style={th}>CRITICAL</th>
+                  <th style={th}>AVG RISK</th>
+                </tr>
+              </thead>
 
-                <div
-                  style={{
-                    color: "#94a3b8",
-                    fontSize:
-                      "12px",
-                    marginTop: "4px",
-                  }}
-                >
-                  {
-                    report.report_type
-                  }{" "}
-                  •{" "}
-                  {new Date(
-                    report.created_at
-                  ).toLocaleString()}
-                </div>
-              </div>
+              <tbody>
+                {reports.map((r) => (
+                  <tr key={r.id}>
+                    <td style={td}>
+                      {r.report_number ||
+                        `RPT-${r.id}`}
+                    </td>
 
-              <button
-                onClick={() =>
-                  setSelectedReport(
-                    report
-                  )
-                }
-                style={{
-                  background:
-                    "#172b4d",
-                  color:
-                    "#60a5fa",
-                  border:
-                    "1px solid #334155",
-                  borderRadius:
-                    "6px",
-                  padding:
-                    "8px 14px",
-                  cursor:
-                    "pointer",
-                }}
-              >
-                View Report
-              </button>
-            </div>
-          ))
+                    <td style={td}>
+                      {r.report_type ||
+                        "SECURITY ANALYSIS"}
+                    </td>
+
+                    <td style={td}>
+                      {r.activities_analyzed ?? 0}
+                    </td>
+
+                    <td style={td}>
+                      {r.threats_detected ?? 0}
+                    </td>
+
+                    <td style={td}>
+                      {r.critical_threats ?? 0}
+                    </td>
+
+                    <td style={td}>
+                      {r.average_risk_score ?? 0}/100
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
     </div>
   );
 }
 
-function Card({ title, value }) {
+function Card({
+  title,
+  value,
+  subtitle,
+  color,
+}) {
   return (
     <div
       style={{
         background: "#131d31",
-        border:
-          "1px solid #26344d",
+        border: "1px solid #26344d",
+        borderLeft: `4px solid ${color}`,
         borderRadius: "12px",
         padding: "22px",
-        borderLeft:
-          "4px solid #3b82f6",
       }}
     >
-      <div
-        style={{
-          color: "#94a3b8",
-          fontSize: "13px",
-        }}
-      >
-        {title}
-      </div>
+      <div style={muted}>{title}</div>
 
       <div
         style={{
-          fontSize: "28px",
+          fontSize: "30px",
           fontWeight: "800",
           marginTop: "8px",
         }}
       >
         {value}
       </div>
+
+      {subtitle && (
+        <div
+          style={{
+            color: "#38bdf8",
+            fontSize: "12px",
+            marginTop: "5px",
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
     </div>
   );
 }
 
-function MiniStat({
-  label,
-  value,
-}) {
+function Step({ n, title, text }) {
   return (
     <div
       style={{
+        flex: "1 1 150px",
         background: "#0d1628",
-        padding: "15px",
-        borderRadius: "8px",
-        border:
-          "1px solid #26344d",
+        border: "1px solid #334155",
+        borderRadius: "10px",
+        padding: "18px",
+        textAlign: "center",
       }}
     >
       <div
         style={{
-          color: "#64748b",
-          fontSize: "11px",
+          width: "30px",
+          height: "30px",
+          borderRadius: "50%",
+          background: "#2563eb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 8px",
+          fontWeight: "800",
         }}
       >
-        {label}
+        {n}
       </div>
+
+      <strong>{title}</strong>
 
       <div
         style={{
-          fontSize: "20px",
-          fontWeight: "700",
+          color: "#94a3b8",
+          fontSize: "12px",
           marginTop: "5px",
         }}
       >
-        {value}
+        {text}
       </div>
     </div>
   );
 }
 
-function Section({
-  title,
-  text,
-}) {
+function Arrow() {
   return (
-    <div
+    <span
       style={{
-        marginTop: "20px",
+        color: "#3b82f6",
+        fontSize: "24px",
       }}
     >
-      <h3
-        style={{
-          color: "#60a5fa",
-        }}
-      >
-        {title}
-      </h3>
+      →
+    </span>
+  );
+}
 
-      <p
+function Progress({
+  label,
+  value,
+  total,
+}) {
+  const percentage =
+    total > 0
+      ? Math.round((value / total) * 100)
+      : 0;
+
+  return (
+    <div style={{ marginTop: "18px" }}>
+      <div
         style={{
-          color: "#cbd5e1",
-          lineHeight: "1.7",
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: "13px",
         }}
       >
-        {text}
-      </p>
+        <span>{label}</span>
+        <strong>
+          {value} ({percentage}%)
+        </strong>
+      </div>
+
+      <div
+        style={{
+          height: "7px",
+          background: "#1e293b",
+          borderRadius: "10px",
+          marginTop: "7px",
+        }}
+      >
+        <div
+          style={{
+            width: `${percentage}%`,
+            height: "100%",
+            background: "#3b82f6",
+            borderRadius: "10px",
+          }}
+        />
+      </div>
     </div>
   );
 }
+
+function Info({ label, value }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        padding: "13px 0",
+        borderBottom: "1px solid #26344d",
+      }}
+    >
+      <span style={muted}>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Severity({ level }) {
+  const color =
+    level === "CRITICAL"
+      ? "#ef4444"
+      : level === "HIGH"
+      ? "#f97316"
+      : level === "MEDIUM"
+      ? "#eab308"
+      : "#22c55e";
+
+  return (
+    <span
+      style={{
+        color,
+        fontWeight: "800",
+      }}
+    >
+      {level || "LOW"}
+    </span>
+  );
+}
+
+const page = {
+  minHeight: "100vh",
+  background: "#080d19",
+  color: "#e5e7eb",
+  padding: "30px",
+};
+
+const header = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "20px",
+  flexWrap: "wrap",
+};
+
+const muted = {
+  color: "#94a3b8",
+};
+
+const grid4 = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: "18px",
+  marginBottom: "28px",
+};
+
+const twoColumns = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "18px",
+  marginBottom: "28px",
+};
+
+const panel = {
+  background: "#131d31",
+  border: "1px solid #26344d",
+  borderRadius: "12px",
+  padding: "22px",
+  marginBottom: "28px",
+};
+
+const pipeline = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const button = {
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: "8px",
+  padding: "13px 20px",
+  fontWeight: "700",
+  cursor: "pointer",
+};
+
+const messageBox = {
+  margin: "20px 0",
+  padding: "13px 18px",
+  borderRadius: "8px",
+  background: "#0d2235",
+  border: "1px solid #075985",
+  color: "#38bdf8",
+};
+
+const scroll = {
+  overflowX: "auto",
+};
+
+const table = {
+  width: "100%",
+  borderCollapse: "collapse",
+};
+
+const th = {
+  textAlign: "left",
+  padding: "13px",
+  color: "#60a5fa",
+  fontSize: "11px",
+  borderBottom: "1px solid #26344d",
+};
+
+const td = {
+  padding: "13px",
+  borderBottom: "1px solid #1e293b",
+  fontSize: "13px",
+};
+
+const danger = {
+  color: "#ef4444",
+  fontWeight: "800",
+};
+
+const success = {
+  color: "#22c55e",
+  fontWeight: "800",
+};
+
+const info = {
+  color: "#38bdf8",
+  fontWeight: "800",
+};

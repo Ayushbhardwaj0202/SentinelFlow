@@ -37,6 +37,11 @@ export default function Layout() {
       label: "Reports",
     },
     {
+  path: "/ml-performance",
+  icon: "◈",
+  label: "ML Performance"
+},
+    {
       path: "/audit-logs",
       icon: "◫",
       label: "Audit Logs",

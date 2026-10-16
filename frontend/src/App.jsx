@@ -7,13 +7,13 @@ import {
 } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
-
+import MLPerformance from "./pages/MLPerformance";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Activities from "./pages/Activities";
 import Investigations from "./pages/Investigations";
 import Reports from "./pages/Reports";
-import AuditLogs from "./pages/AuditLogs";
+import  AuditLogs  from "./pages/AuditLogs";
 import Layout from "./components/Layout";
 
 import {
@@ -26,20 +26,13 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-
         <Routes>
-
-          {/* LOGIN - NO SIDEBAR */}
           <Route
             path="/login"
             element={<Login />}
           />
 
-          {/* APPLICATION WITH SIDEBAR */}
-          <Route
-            element={<Layout />}
-          >
-
+          <Route element={<Layout />}>
             <Route
               path="/dashboard"
               element={<Dashboard />}
@@ -55,6 +48,11 @@ function App() {
               element={<Threats />}
             />
 
+<Route
+  path="/ml-performance"
+  element={<MLPerformance />}
+/>
+
             <Route
               path="/investigations"
               element={<Investigations />}
@@ -69,7 +67,6 @@ function App() {
               path="/audit-logs"
               element={<AuditLogs />}
             />
-
           </Route>
 
           <Route
@@ -91,9 +88,7 @@ function App() {
               />
             }
           />
-
         </Routes>
-
       </BrowserRouter>
     </AuthProvider>
   );

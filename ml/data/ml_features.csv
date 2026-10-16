@@ -1,0 +1,11 @@
+hour,day_of_week,is_weekend,after_hours,is_file_access,is_failed_login,is_data_export,sensitive_resource,unknown_device,private_ip,activity_frequency,failed_login_count,data_export_frequency,sensitive_access_frequency,risk_score,risk_score_normalized
+12,5,1,0,1,0,0,1,0,1,5,0,0,5,55,0.55
+12,5,1,0,1,0,0,1,0,1,5,0,0,5,55,0.55
+12,5,1,0,1,0,0,1,0,1,5,0,0,5,55,0.55
+12,5,1,0,0,1,0,1,0,1,1,1,0,1,75,0.75
+12,5,1,0,0,0,1,1,0,1,1,0,1,1,100,1.0
+12,5,1,0,1,0,0,1,0,1,5,0,0,5,55,0.55
+12,5,1,0,1,0,0,1,0,1,5,0,0,5,55,0.55
+12,5,1,0,0,0,1,1,0,1,3,0,3,3,100,1.0
+12,5,1,0,0,0,1,1,0,1,3,0,3,3,100,1.0
+12,5,1,0,0,0,1,1,0,1,3,0,3,3,100,1.0

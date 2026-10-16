@@ -1,132 +1,506 @@
-const express = require("express");
-const { Pool } = require("pg");
+import React, { useEffect, useState } from "react";
+import { auditAPI } from "../services/api";
 
-const router = express.Router();
+export default function AuditLogs() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+  const loadLogs = async () => {
+    try {
+      const response = await auditAPI.getAll();
 
-/* =========================================
-   CREATE AUDIT TABLE
-========================================= */
+      const data = response.data;
 
-async function ensureTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS sentinelflow_audit_logs (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(100),
-      action VARCHAR(150),
-      module VARCHAR(100),
-      reference_id VARCHAR(100),
-      status VARCHAR(50) DEFAULT 'SUCCESS',
-      details TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
+      setLogs(
+        Array.isArray(data)
+          ? data
+          : data.logs ||
+              data.auditLogs ||
+              data.events ||
+              []
+      );
 
-/* =========================================
-   GET LIVE AUDIT LOGS
-========================================= */
+      setError("");
+    } catch (err) {
+      console.error(err);
 
-router.get("/", async (req, res) => {
-  try {
-    await ensureTable();
+      setError(
+        err.response?.data?.error ||
+          "Failed to load audit logs"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    /*
-      Combine actual system activity,
-      threat and investigation events.
-    */
+  useEffect(() => {
+    loadLogs();
 
-    const result = await pool.query(`
-      SELECT *
-      FROM (
-        SELECT
-          id,
-          username,
-          activity_type AS action,
-          'Activity Monitoring' AS module,
-          CONCAT('ACT-', id) AS reference_id,
-          'SUCCESS' AS status,
-          CONCAT(
-            'Activity detected: ',
-            activity_type,
-            ' on ',
-            COALESCE(resource, 'system resource'),
-            '. Risk score: ',
-            risk_score
-          ) AS details,
-          created_at
-        FROM sentinelflow_activities
-
-        UNION ALL
-
-        SELECT
-          id,
-          username,
-          'THREAT_DETECTED' AS action,
-          'Threat Detection' AS module,
-          CONCAT('THR-', id) AS reference_id,
-          CASE
-            WHEN status = 'RESOLVED'
-              THEN 'RESOLVED'
-            ELSE 'SUCCESS'
-          END AS status,
-          CONCAT(
-            threat_type,
-            ' detected with severity ',
-            severity,
-            '. Risk score: ',
-            risk_score,
-            '. Current status: ',
-            status
-          ) AS details,
-          created_at
-        FROM sentinelflow_threat_alerts
-
-        UNION ALL
-
-        SELECT
-          id,
-          investigator AS username,
-          CASE
-            WHEN status = 'RESOLVED'
-              THEN 'INVESTIGATION_RESOLVED'
-            ELSE 'INVESTIGATION_STARTED'
-          END AS action,
-          'Investigation' AS module,
-          CONCAT('INV-', id) AS reference_id,
-          'SUCCESS' AS status,
-          CONCAT(
-            title,
-            '. Case status: ',
-            status
-          ) AS details,
-          created_at
-        FROM sentinelflow_investigations
-      ) audit_events
-      ORDER BY created_at DESC
-      LIMIT 100
-    `);
-
-    res.json({
-      success: true,
-      count: result.rows.length,
-      logs: result.rows,
-    });
-  } catch (error) {
-    console.error(
-      "Audit log error:",
-      error
+    const interval = setInterval(
+      loadLogs,
+      5000
     );
 
-    res.status(500).json({
-      success: false,
-      error: "Failed to load audit logs",
-      details: error.message,
-    });
-  }
-});
+    return () => clearInterval(interval);
+  }, []);
 
-module.exports = router;
+  const securityEvents = logs.filter(
+    (log) =>
+      String(
+        log.module ||
+          log.action ||
+          ""
+      )
+        .toLowerCase()
+        .includes("threat") ||
+      String(
+        log.action || ""
+      )
+        .toLowerCase()
+        .includes("alert")
+  ).length;
+
+  const investigations = logs.filter(
+    (log) =>
+      String(
+        log.module ||
+          log.action ||
+          ""
+      )
+        .toLowerCase()
+        .includes("investigation")
+  ).length;
+
+  const getStatusColor = (status) => {
+    const value = String(
+      status || ""
+    ).toUpperCase();
+
+    if (
+      value === "SUCCESS" ||
+      value === "RESOLVED" ||
+      value === "NORMAL"
+    ) {
+      return "#4ade80";
+    }
+
+    if (
+      value === "OPEN" ||
+      value === "CRITICAL" ||
+      value === "FAILED"
+    ) {
+      return "#f87171";
+    }
+
+    return "#facc15";
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "-";
+
+    return new Date(date).toLocaleString(
+      "en-IN",
+      {
+        dateStyle: "short",
+        timeStyle: "medium",
+      }
+    );
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#080d19",
+        color: "#e2e8f0",
+        padding: "30px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems: "center",
+          marginBottom: "25px",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              color: "#f8fafc",
+              fontSize: "28px",
+            }}
+          >
+            Audit Logs
+          </h1>
+
+          <p
+            style={{
+              marginTop: "7px",
+              color: "#64748b",
+            }}
+          >
+            Live security activity and
+            system audit trail
+          </p>
+        </div>
+
+        <div
+          style={{
+            padding: "8px 14px",
+            borderRadius: "20px",
+            background: "#0b1f17",
+            border:
+              "1px solid #14532d",
+            color: "#22c55e",
+            fontSize: "12px",
+            fontWeight: 700,
+          }}
+        >
+          ● LIVE
+        </div>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            background: "#35151a",
+            border:
+              "1px solid #7f1d1d",
+            color: "#f87171",
+            padding: "14px",
+            borderRadius: "8px",
+            marginBottom: "20px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* SUMMARY */}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(3, 1fr)",
+          gap: "15px",
+          marginBottom: "25px",
+        }}
+      >
+        <SummaryCard
+          title="Total Events"
+          value={logs.length}
+          subtitle="Live audit events"
+          accent="#60a5fa"
+        />
+
+        <SummaryCard
+          title="Security Events"
+          value={securityEvents}
+          subtitle="Threat-related activity"
+          accent="#ef4444"
+        />
+
+        <SummaryCard
+          title="Investigations"
+          value={investigations}
+          subtitle="Investigation activity"
+          accent="#a78bfa"
+        />
+      </div>
+
+      {/* AUDIT TABLE */}
+
+      <div
+        style={{
+          background: "#0b1220",
+          border:
+            "1px solid #26344d",
+          borderRadius: "10px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "18px 20px",
+            borderBottom:
+              "1px solid #26344d",
+          }}
+        >
+          <h2
+            style={{
+              margin: 0,
+              color: "#f8fafc",
+              fontSize: "16px",
+            }}
+          >
+            Security Audit Trail
+          </h2>
+        </div>
+
+        {loading ? (
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "#64748b",
+            }}
+          >
+            Loading audit events...
+          </div>
+        ) : logs.length === 0 ? (
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "#64748b",
+            }}
+          >
+            No audit events found.
+          </div>
+        ) : (
+          <div
+            style={{
+              overflowX: "auto",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse:
+                  "collapse",
+                minWidth: "950px",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    background:
+                      "#0f172a",
+                  }}
+                >
+                  {[
+                    "Time",
+                    "User",
+                    "Action",
+                    "Module",
+                    "Reference",
+                    "Status",
+                    "Details",
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      style={{
+                        padding:
+                          "13px 12px",
+                        textAlign: "left",
+                        color:
+                          "#64748b",
+                        fontSize:
+                          "11px",
+                        textTransform:
+                          "uppercase",
+                        letterSpacing:
+                          "0.5px",
+                      }}
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {logs.map(
+                  (log, index) => {
+                    const status =
+                      log.status ||
+                      "SUCCESS";
+
+                    return (
+                      <tr
+                        key={
+                          log.id ||
+                          `${index}-${log.created_at}`
+                        }
+                        style={{
+                          borderTop:
+                            "1px solid #1e293b",
+                        }}
+                      >
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          {formatDate(
+                            log.created_at ||
+                              log.timestamp ||
+                              log.time
+                          )}
+                        </td>
+
+                        <td
+                          style={{
+                            ...cellStyle,
+                            color:
+                              "#f8fafc",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {log.username ||
+                            log.user ||
+                            "System"}
+                        </td>
+
+                        <td
+                          style={{
+                            ...cellStyle,
+                            color:
+                              "#60a5fa",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {log.action ||
+                            log.event ||
+                            "-"}
+                        </td>
+
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          {log.module ||
+                            "-"}
+                        </td>
+
+                        <td
+                          style={{
+                            ...cellStyle,
+                            color:
+                              "#94a3b8",
+                          }}
+                        >
+                          {log.reference ||
+                            log.reference_id ||
+                            log.activity_id ||
+                            "-"}
+                        </td>
+
+                        <td
+                          style={
+                            cellStyle
+                          }
+                        >
+                          <span
+                            style={{
+                              padding:
+                                "5px 9px",
+                              borderRadius:
+                                "12px",
+                              background:
+                                "#111827",
+                              color:
+                                getStatusColor(
+                                  status
+                                ),
+                              fontSize:
+                                "10px",
+                              fontWeight:
+                                800,
+                            }}
+                          >
+                            {String(
+                              status
+                            ).toUpperCase()}
+                          </span>
+                        </td>
+
+                        <td
+                          style={{
+                            ...cellStyle,
+                            maxWidth:
+                              "350px",
+                          }}
+                        >
+                          {log.details ||
+                            log.description ||
+                            "-"}
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  subtitle,
+  accent,
+}) {
+  return (
+    <div
+      style={{
+        background: "#0b1220",
+        border:
+          "1px solid #26344d",
+        borderTop:
+          `2px solid ${accent}`,
+        borderRadius: "9px",
+        padding: "18px",
+      }}
+    >
+      <div
+        style={{
+          color: "#64748b",
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform:
+            "uppercase",
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          color: "#f8fafc",
+          fontSize: "26px",
+          fontWeight: 800,
+          marginTop: "7px",
+        }}
+      >
+        {value}
+      </div>
+
+      <div
+        style={{
+          color: "#64748b",
+          fontSize: "10px",
+          marginTop: "4px",
+        }}
+      >
+        {subtitle}
+      </div>
+    </div>
+  );
+}
+
+const cellStyle = {
+  padding: "13px 12px",
+  color: "#94a3b8",
+  fontSize: "11px",
+};

@@ -1,0 +1,23 @@
+SENTINELFLOW ML MODEL EVALUATION
+============================================================
+
+Dataset: Synthetic labeled behavioral security benchmark
+Training samples: 700
+Testing samples: 300
+
+           Model  Accuracy  Precision  Recall  F1 Score
+     Rule Engine  0.926667   0.731707     1.0  0.845070
+Isolation Forest  0.800000   0.500000     1.0  0.666667
+Hybrid Rule + ML  0.943333   0.779221     1.0  0.875912
+
+Rule Engine Confusion Matrix:
+[[218  22]
+ [  0  60]]
+
+Isolation Forest Confusion Matrix:
+[[180  60]
+ [  0  60]]
+
+Hybrid Model Confusion Matrix:
+[[223  17]
+ [  0  60]]

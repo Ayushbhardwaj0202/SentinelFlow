@@ -1,0 +1,33 @@
+
+SENTINELFLOW ML MODEL EVALUATION
+================================
+
+Algorithm:
+Isolation Forest
+
+Evaluation Samples:
+495
+
+Precision:
+1.0000
+
+Recall:
+0.9494
+
+F1 Score:
+0.9740
+
+Confusion Matrix:
+[[416   0]
+ [  4  75]]
+
+NOTE:
+The current SentinelFlow database contains a small number
+of real activity records without ground-truth anomaly labels.
+
+Therefore, these evaluation metrics are based on the
+controlled synthetic behavioural records used during
+initial model development.
+
+Real SentinelFlow activities are scored by the trained
+model but are not treated as ground-truth labeled data.
