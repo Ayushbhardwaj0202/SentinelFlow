@@ -1,185 +1,707 @@
-# SentinelFlow – Intelligent Insider Threat Detection and Risk Analysis Platform
+# SentinelFlow
+## Intelligent Insider Threat Detection and Risk Analysis Platform
 
-[![Status](https://img.shields.io/badge/Status-Complete%20MVP-brightgreen)](https://github.com)
-[![Tech Stack](https://img.shields.io/badge/Stack-PostgreSQL%20%7C%20Node.js%20%7C%20React%2019-blue)](https://github.com)
-[![Architecture](https://img.shields.io/badge/Architecture-SOC%20Multi--Tier-orange)](https://github.com)
-[![Academic Project](https://img.shields.io/badge/Course-Software%20Engineering%20Lab-purple)](https://github.com)
+SentinelFlow is an intelligent cybersecurity platform designed to detect suspicious user behaviour and potential insider threats within an organization.
 
-SentinelFlow is an end-to-end insider threat detection and behavioral risk analysis platform engineered for enterprise Security Operations Centers (SOC). The platform monitors employee, device, and network telemetry in real time, applies deterministic risk scoring across behavioral vectors, detects exfiltration and policy breaches, dispatches triage alerts, and provides a full forensic investigation lifecycle.
+The system combines an **explainable rule-based risk engine** with **machine-learning-based anomaly detection using Isolation Forest**. These two detection signals are combined into a hybrid risk score to identify suspicious activities, generate threats, support security investigations, and provide security reports and audit logs.
 
 ---
 
-## Key Capabilities & Features
+## 1. Problem Statement
 
-### 1. Telemetry Monitoring & Audit Logging
-- **Activity Stream**: Tracks logins, file downloads, database queries, and data export operations.
-- **Device & Session Telemetry**: Captures operating systems, MAC addresses, IP subnets, and active session durations.
-- **Immutable Audit Trail**: Append-only ledger recording all actor actions for compliance and governance.
+Insider threats occur when legitimate users misuse their authorized access to organizational resources.
 
-### 2. Behavioral Analysis & Risk Engine
-- **Deterministic 0–100 Risk Scoring**: Evaluates failed authentication bursts, off-hours logins (outside 08:00–18:00), anomalous export volumes, and sensitive resource access.
-- **Categorical Severity Classification**: Classifies activity into `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL` risk tiers with clear contributing factor explanations.
-- **Dynamic User Profiling**: Updates employee risk status dynamically as new activities occur.
+Traditional security systems primarily depend on predefined rules. Although rule-based detection is effective for known security violations, it may not identify unusual behavioural patterns that do not exactly match predefined rules.
 
-### 3. Automated Threat Detection & Alert Triage
-- **Real-Time Detection**: Automatically generates threat alerts for high-risk anomalies ($\ge 30$ risk score).
-- **SOC Alert Management**: Enables security analysts to filter, acknowledge, and resolve alerts or escalate to forensic cases.
+SentinelFlow addresses this problem by combining:
 
-### 4. Forensic Investigation Workflow
-- **Case Management**: Unique tracking IDs (`CASE-YYYYMMDD-XXXX`), analyst assignments, and priority ratings.
-- **Evidence & Findings Attachment**: Analysts record notes, forensic evidence, and conclusive findings directly within case dossiers.
-
-### 5. Security Reporting & Policy Administration
-- **Automated Report Generation**: Assembles incident reports, risk profiles, and executive security summaries.
-- **Policy Enforcement**: Configurable access and data boundaries (working hours, export thresholds, VPN requirements).
-
-### 6. Role-Based Access Control (RBAC)
-- Multi-tier authorization distinguishing **Administrators**, **Security Analysts**, and standard **Employees**.
+- Rule-based security detection
+- Behavioural anomaly detection
+- Hybrid risk assessment
+- Automated threat generation
+- Security investigation workflows
+- Reporting and auditing
 
 ---
 
-## Technology Stack
+## 2. Objectives
 
-| Layer | Technologies |
-|---|---|
-| **Database** | PostgreSQL 14+, pg connection pool, JSONB attributes, indexed relational schema |
-| **Backend API** | Node.js, Express.js, JWT (`jsonwebtoken`), BCrypt (`bcryptjs`), CORS |
-| **Frontend** | React 19, Vite, React Router v7, Vanilla SOC Dark Mode CSS |
-| **Security** | Parameterized SQL queries, salted password hashing (10 rounds), bearer token auth, RBAC route guards |
+The main objectives of SentinelFlow are:
+
+- Monitor user activities and device information.
+- Identify suspicious user behaviour.
+- Calculate security risk scores.
+- Detect behavioural anomalies using machine learning.
+- Combine rule-based and ML-based detection.
+- Automatically generate security threats.
+- Support investigation and threat resolution.
+- Generate security reports.
+- Maintain audit records of security activities.
 
 ---
 
-## Architecture
+## 3. Key Features
 
+### Authentication & Role Management
+- Secure user authentication.
+- JWT-based authentication.
+- Password hashing using bcrypt.
+- Role-based access for:
+  - Employee
+  - Security Analyst
+  - Administrator
+
+### Activity Monitoring
+The system records activities such as:
+
+- File access
+- Failed login attempts
+- Data exports
+- Sensitive resource access
+- Unknown device activity
+
+### Rule-Based Risk Engine
+
+The rule engine calculates an initial risk score based on security-related activity.
+
+Example scoring:
+
+| Activity / Condition | Risk Contribution |
+|---|---:|
+| Base Risk | 10 |
+| Failed Login | +45 |
+| File Access | +25 |
+| Data Export | +70 |
+| Sensitive Resource | +20 |
+| Unknown Device | +25 |
+
+The final rule score is capped at 100.
+
+Risk levels:
+
+| Score | Risk Level |
+|---:|---|
+| 80–100 | CRITICAL |
+| 60–79 | HIGH |
+| 30–59 | MEDIUM |
+| 0–29 | LOW |
+
+### Machine Learning Anomaly Detection
+
+SentinelFlow uses an **Isolation Forest** model to identify unusual activity patterns.
+
+The ML model considers behavioural features such as:
+
+- Hour of activity
+- Day of week
+- Weekend activity
+- After-hours activity
+- File access
+- Failed login
+- Data export
+- Sensitive resource access
+- Unknown device
+- Private IP information
+- Activity frequency
+- Failed-login frequency
+- Data-export frequency
+- Sensitive-access frequency
+- Rule-based risk score
+
+### Hybrid Detection
+
+The system combines rule-based and ML signals.
+
+The hybrid score is calculated as:
+
+`Hybrid Risk Score = Rule Risk Score × 0.65 + ML Risk Score × 0.35`
+
+This approach combines:
+
+- **Rule Engine:** deterministic and explainable security rules
+- **Machine Learning:** behavioural anomaly detection
+
+If the ML service is unavailable, the system automatically falls back to rule-based detection.
+
+### Threat Detection
+
+Detected activities can automatically generate threats.
+
+Examples include:
+
+- Large Data Export
+- Suspicious Login Attempt
+- Unknown Device Activity
+- Sensitive File Access
+- Suspicious Activity
+
+### Investigation Management
+
+Security analysts can:
+
+- Review detected threats
+- Create investigations
+- Track investigation status
+- Record investigation details
+- Update investigation outcomes
+
+### Security Reports
+
+The platform provides security reporting including:
+
+- Activities analyzed
+- Threats detected
+- Critical threats
+- High-risk threats
+- ML anomalies
+- Hybrid detections
+- Average ML score
+- Average hybrid risk
+- ML-assisted threats
+- Threat intelligence
+- Detection breakdown
+
+### Audit Logs
+
+Security-related activities, threats, and investigation events are available through the audit log interface.
+
+### ML Performance Dashboard
+
+The platform includes a dedicated ML performance dashboard for comparing:
+
+- Rule Engine
+- Isolation Forest
+- Hybrid Rule + ML
+
+using:
+
+- Accuracy
+- Precision
+- Recall
+- F1 Score
+- Confusion Matrix
+
+---
+
+## 4. System Architecture
+
+```text
+                    ┌─────────────────────┐
+                    │      React UI       │
+                    │     Frontend        │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Node.js +         │
+                    │   Express Backend   │
+                    └───────┬───────┬─────┘
+                            │       │
+                ┌───────────┘       └──────────────┐
+                ▼                                  ▼
+      ┌──────────────────┐              ┌──────────────────┐
+      │   PostgreSQL     │              │ Python ML Service│
+      │    Database      │              │ FastAPI/Uvicorn  │
+      └──────────────────┘              └────────┬─────────┘
+                                                 │
+                                                 ▼
+                                      ┌────────────────────┐
+                                      │   Isolation Forest │
+                                      │   Anomaly Model    │
+                                      └────────────────────┘
 ```
-                    ┌───────────────────────────────────────────────┐
-                    │       SentinelFlow SOC Web Console            │
-                    │   (React 19, Vite, Dark Cybersecurity Theme)  │
-                    └───────────────────────┬───────────────────────┘
-                                            │ HTTP / JSON (REST API)
-                                            ▼
-                    ┌───────────────────────────────────────────────┐
-                    │           Express.js API Gateway              │
-                    │      (Auth & RBAC Middleware, CORS, JWT)      │
-                    └───────┬───────────────────────────────┬───────┘
-                            │                               │
-            ┌───────────────▼──────────────┐ ┌──────────────▼──────────────┐
-            │   Core Detection Engine      │ │   Forensic Investigation    │
-            │ • Deterministic Risk Scorer  │ │ • Case Tracking             │
-            │ • Anomaly Rule Evaluator     │ │ • Evidence Findings Log     │
-            │ • Dynamic Profile Updaters   │ │ • Report Generator          │
-            └───────────────┬──────────────┘ └──────────────┬──────────────┘
-                            │                               │
-                            └───────────────┬───────────────┘
-                                            │ pg Pool (Parameterized)
-                                            ▼
-                    ┌───────────────────────────────────────────────┐
-                    │              PostgreSQL Database              │
-                    │ (Users, Sessions, Telemetry, Alerts, Audit)  │
-                    └───────────────────────────────────────────────┘
+
+### Detection Workflow
+
+```text
+User Authentication
+        ↓
+Activity Monitoring
+        ↓
+Activity Logging
+        ↓
+Rule-Based Risk Analysis
+        +
+Isolation Forest Anomaly Detection
+        ↓
+Hybrid Risk Assessment
+        ↓
+Threat Detection
+        ↓
+Automatic Threat Generation
+        ↓
+Investigation
+        ↓
+Reporting & Audit
 ```
 
-Detailed technical specifications are available in the [Architecture Documentation](docs/architecture.md).
+
+
+## 5. Technology Stack
+
+### Frontend
+
+- React
+- Vite
+- React Router
+- Axios
+- CSS
+
+### Backend
+
+- Node.js
+- Express.js
+- JWT
+- bcryptjs
+- REST APIs
+
+### Database
+
+- PostgreSQL
+
+### Machine Learning
+
+- Python
+- pandas
+- NumPy
+- scikit-learn
+- joblib
+
+### ML API
+
+- FastAPI
+- Uvicorn
+
+### Development Tools
+
+- Visual Studio Code
+- Git
+- GitHub
+- PowerShell
 
 ---
 
-## Quick Start & Local Setup
+## 6. Project Structure
 
-### 1. Database Setup
+```text
+SentinelFlow/
+│
+├── backend/
+│   ├── routes/
+│   ├── middleware/
+│   ├── services/
+│   ├── server.js
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   └── package.json
+│
+├── ml/
+│   ├── model/
+│   ├── evaluate_model.py
+│   ├── train_model.py
+│   └── ...
+│
+├── README.md
+└── .gitignore
+```
 
-Ensure PostgreSQL is running locally on port 5432, then create and seed the database:
+> The exact contents of individual folders may vary depending on the current implementation.
+
+---
+
+## 7. Backend API Modules
+
+The backend provides REST APIs for:
+
+```text
+/api/auth
+/api/users
+/api/devices
+/api/activities
+/api/sessions
+/api/behavior-analysis
+/api/risk-assessments
+/api/threats
+/api/alerts
+/api/investigations
+/api/reports
+/api/audit-logs
+/api/dashboard
+/api/policies
+```
+
+The ML service provides endpoints including:
+
+```text
+/health
+/predict
+```
+
+---
+
+## 8. Installation
+
+### Prerequisites
+
+Install the following:
+
+- Node.js
+- npm
+- PostgreSQL
+- Python 3.x
+- Git
+
+---
+
+## 9. Backend Setup
+
+Navigate to the backend directory:
 
 ```bash
-# Option A: Automated Node.js Seed (Recommended)
 cd backend
-npm install
-cd ..
-node database/seed.js
-
-# Option B: PostgreSQL CLI (psql)
-createdb -U postgres sentinelflow
-psql -U postgres -d sentinelflow -f database/schema.sql
-psql -U postgres -d sentinelflow -f database/seed.sql
 ```
 
-### 2. Start Backend API Server
+Install dependencies:
 
 ```bash
-cd backend
 npm install
+```
+
+Create a `.env` file using the required environment variables.
+
+Example structure:
+
+```env
+PORT=5000
+DATABASE_URL=your_postgresql_connection_string
+JWT_SECRET=your_secret_key
+ML_SERVICE_URL=http://127.0.0.1:8000
+```
+
+**Do not commit `.env` or real secrets to GitHub.**
+
+Start the backend:
+
+```bash
 npm run dev
 ```
-*API server runs at `http://localhost:5000`.*
 
-### 3. Start Frontend Application
+The backend runs on:
+
+```text
+http://localhost:5000
+```
+
+---
+
+## 10. ML Service Setup
+
+Navigate to the ML directory:
+
+```bash
+cd ml
+```
+
+Create and activate a Python virtual environment if required:
+
+```bash
+python -m venv venv
+```
+
+Windows:
+
+```powershell
+venv\Scripts\activate
+```
+
+Install the required packages:
+
+```bash
+pip install pandas numpy scikit-learn joblib fastapi uvicorn
+```
+
+Start the ML service:
+
+```bash
+uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+The ML service runs on:
+
+```text
+http://127.0.0.1:8000
+```
+
+Health check:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+---
+
+## 11. Frontend Setup
+
+Navigate to the frontend:
 
 ```bash
 cd frontend
+```
+
+Install dependencies:
+
+```bash
 npm install
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
-*Web dashboard runs at `http://localhost:5173`.*
 
----
+The frontend is normally available at:
 
-## Pre-Configured Demo Credentials
-
-| Role | Username | Password | Recommended Workflow |
-|---|---|---|---|
-| **Administrator** | `admin` | `Admin@123` | User & policy administration, audit logs, executive reports |
-| **Security Analyst** | `analyst` | `Analyst@123` | SOC operations, alert triage, opening and managing investigations |
-| **Standard Employee** | `employee1` | `Employee@123` | Viewing personal activity telemetry, low baseline risk |
-| **Risk-Flagged User** | `employee2` | `Employee@123` | Reviewing simulated insider threat events (large data exports) |
-
----
-
-## Project Structure
-
-```
-26-27-fall-se-lab-projects-Ayushbhardwaj0202/
-├── backend/
-│   ├── src/
-│   │   ├── config/          # PostgreSQL database connection pool
-│   │   ├── controllers/     # 14 REST API controllers
-│   │   ├── middleware/      # JWT verification & RBAC authorization
-│   │   ├── routes/          # Express route definitions
-│   │   ├── utils/           # Risk scoring, threat detection, audit logger
-│   │   └── server.js        # Server entry point & route mounting
-│   ├── .env.example         # Environment template
-│   └── package.json
-├── database/
-│   ├── schema.sql           # Complete PostgreSQL DDL with constraints & indexes
-│   ├── seed.sql             # SQL seed dataset with precomputed bcrypt hashes
-│   ├── seed.js              # Node.js seeder script
-│   └── README.md            # Database setup instructions
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # Reusable UI elements (Badges, Modals, StatCards)
-│   │   ├── context/         # AuthContext with token persistence
-│   │   ├── layouts/         # SOC sidebar & header layout
-│   │   ├── pages/           # 15 React views (Dashboard, Alerts, Cases, Reports...)
-│   │   ├── services/        # Centralized Axios API client
-│   │   ├── App.jsx          # Protected route hierarchy
-│   │   ├── index.css        # Cybersecurity SOC dark styling
-│   │   └── main.jsx         # App bootstrap
-│   ├── package.json
-│   └── vite.config.js
-├── docs/
-│   ├── architecture.md      # Multi-tier system architecture specification
-│   ├── api.md               # Complete REST API reference
-│   ├── database.md          # Data dictionary & ERD specification
-│   ├── setup.md             # Step-by-step local installation guide
-│   └── Project_Description.md # Academic course project brief
-└── README.md                # Master repository documentation
+```text
+http://localhost:5173
 ```
 
 ---
 
-## Evaluation & Demonstration Guide
+## 12. Running the Complete System
 
-1. **Dashboard Situational Awareness**: Log in as `analyst` to view live metric cards, risk level distributions, and immediate threat counts.
-2. **Alert Triage**: Navigate to `/alerts` to inspect the *Critical Off-Hours Insider Exfiltration Risk* alert.
-3. **Investigation Workflow**: Navigate to `/investigations` and open *CASE-20261010-0001*. Add notes and evidence to document findings.
-4. **Activity Ingestion**: Submit or simulate new activity logs from `/activities` and observe dynamic score updates.
-5. **Security Reporting**: Generate instant executive and incident reports at `/reports`.
-6. **Administrative Governance**: Log in as `admin` to review system audit logs (`/audit-logs`) and configure detection policies (`/policies`).
+Run the three components separately:
+
+### Terminal 1 — PostgreSQL
+
+Ensure PostgreSQL is running.
+
+### Terminal 2 — ML Service
+
+```bash
+cd ml
+uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+### Terminal 3 — Backend
+
+```bash
+cd backend
+npm run dev
+```
+
+### Terminal 4 — Frontend
+
+```bash
+cd frontend
+npm run dev
+```
+
+Then open the frontend URL provided by Vite.
+
+---
+
+## 13. Demo Credentials
+
+The project includes demo accounts for demonstration purposes.
+
+| Role | Username | Password |
+|---|---|---|
+| Administrator | `admin` | `Admin@123` |
+| Security Analyst | `analyst` | `Analyst@123` |
+| Employee | `employee1` | `Employee@123` |
+| Employee | `employee2` | `Employee@123` |
+
+> These credentials are intended only for local/project demonstration.
+
+---
+
+## 14. Example Detection Scenario
+
+A high-risk activity can be generated using a data export from an unknown device.
+
+Example:
+
+```text
+Username: employee5
+Activity: DATA_EXPORT
+Resource: Customer_Database
+Device: Unknown Device
+IP: 172.16.10.45
+```
+
+The system evaluates the activity using both detection mechanisms.
+
+Example result:
+
+```text
+Rule Risk Score:       100
+ML Anomaly Score:      0.5499
+ML Anomaly:            TRUE
+Hybrid Risk Score:     84
+Risk Level:            CRITICAL
+Detection Method:      HYBRID_RULE_ML
+Threat:                Large Data Export
+Status:                OPEN
+```
+
+This demonstrates the complete pipeline:
+
+```text
+Activity
+   ↓
+Rule Engine
+   +
+Isolation Forest
+   ↓
+Hybrid Risk Score
+   ↓
+CRITICAL Risk
+   ↓
+Automatic Threat
+   ↓
+Investigation
+```
+
+---
+
+## 15. ML Evaluation
+
+The ML evaluation uses a **synthetic labeled benchmark** consisting of:
+
+- 1,000 total samples
+- 700 training samples
+- 300 test samples
+- 800 normal samples
+- 200 anomalous samples
+
+### Results
+
+| Model | Accuracy | Precision | Recall | F1 Score |
+|---|---:|---:|---:|---:|
+| Rule Engine | 92.67% | 73.17% | 100% | 84.51% |
+| Isolation Forest | 80.00% | 50.00% | 100% | 66.67% |
+| Hybrid Rule + ML | **94.33%** | **77.92%** | **100%** | **87.59%** |
+
+The hybrid approach performed better than either individual detection method on this benchmark.
+
+**Important:** These results are based on a synthetic evaluation dataset and should not be interpreted as production performance.
+
+---
+
+## 16. Security Considerations
+
+SentinelFlow includes several security-oriented mechanisms:
+
+- JWT-based authentication
+- Password hashing with bcrypt
+- Role-based access
+- Risk scoring
+- Threat detection
+- Audit logging
+- ML anomaly detection
+- ML-service failure fallback
+- Separation of frontend, backend, database and ML service
+
+Sensitive configuration values should be stored in environment variables and should not be committed to the repository.
+
+---
+
+## 17. Future Scope
+
+Possible future improvements include:
+
+- Real-time enterprise activity monitoring
+- Integration with SIEM platforms
+- Real organizational security datasets
+- Advanced behavioural profiling
+- Explainable AI for anomaly decisions
+- Automated incident response
+- Email and Slack security notifications
+- Continuous model retraining
+- Advanced user and entity behaviour analytics
+- Cloud deployment
+- Containerization using Docker
+
+---
+
+## 18. Project Contribution
+
+SentinelFlow integrates multiple areas of software engineering and cybersecurity into a single platform:
+
+```text
+Full-Stack Development
+        +
+Cybersecurity Rule Engine
+        +
+Machine Learning
+        +
+Threat Investigation
+        +
+Security Reporting
+        +
+Audit Management
+```
+
+The primary contribution is an end-to-end insider-threat detection workflow that combines explainable security rules with machine-learning-based behavioural anomaly detection.
+
+---
+
+## 19. Team
+
+**Project:** SentinelFlow – Intelligent Insider Threat Detection and Risk Analysis Platform
+
+**Institution:** VIT Chennai
+
+**Course:** Software Engineering
+
+**Team Members:**
+
+- Ayush Bhardwaj
+- [Team Member 2]
+- [Team Member 3]
+- [Team Member 4]
+
+> Replace the team-member placeholders with the final team details before submission.
+
+---
+
+## 20. Repository
+
+The source code is maintained using Git and GitHub.
+
+**Personal Repository:**  
+`https://github.com/Ayushbhardwaj0202/SentinelFlow`
+
+**VIT Classroom Repository:**  
+`[Add VIT Classroom repository link]`
+
+---
+
+## 21. Project Status
+
+**Status: Completed / Demonstration Ready**
+
+The implemented platform provides:
+
+- Authentication
+- Activity monitoring
+- Risk assessment
+- Rule-based detection
+- ML anomaly detection
+- Hybrid threat detection
+- Threat management
+- Investigation management
+- Security reports
+- Audit logs
+- ML performance evaluation
+- Integrated React, Node.js, PostgreSQL and Python ML architecture
