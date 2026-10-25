@@ -667,11 +667,7 @@ The primary contribution is an end-to-end insider-threat detection workflow that
 **Team Members:**
 
 - Ayush Bhardwaj
-- [Team Member 2]
-- [Team Member 3]
-- [Team Member 4]
 
-> Replace the team-member placeholders with the final team details before submission.
 
 ---
 
@@ -683,7 +679,7 @@ The source code is maintained using Git and GitHub.
 `https://github.com/Ayushbhardwaj0202/SentinelFlow`
 
 **VIT Classroom Repository:**  
-`[Add VIT Classroom repository link]`
+`[https://github.com/25-26-WIN-BCSE301L-SOFTWARE-ENGINEERING/26-27-fall-se-lab-projects-Ayushbhardwaj0202]`
 
 ---
 
